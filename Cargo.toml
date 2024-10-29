@@ -63,7 +63,7 @@ notify-debouncer-full = "0.3.1"
 idna                  = "1.0.2"
 
 [dependencies.reqwest]
-version = "0.12.7"
+version = "0.12.9"
 default-features = false
 features = [
     "charset",
