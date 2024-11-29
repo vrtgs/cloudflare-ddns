@@ -53,7 +53,7 @@ clap                  = { version = "4.5.18", features = ["derive"] }
 simdutf8              = "0.1.5"
 toml                  = "0.8.19"
 serde_json            = "1.0.128"
-bytes                 = "1.7.0"
+bytes                 = "1.9.0"
 thiserror             = "1.0.63"
 ahash                 = "0.8.11"
 url                   = "2.5.2"
