@@ -62,7 +62,7 @@ mod sys {
 
     fn encode_wide(str: &OsStr) -> Vec<u16> {
         str.encode_wide()
-            .map_while(NonZeroU16::new)
+            .filter_map(NonZeroU16::new)
             .map(NonZeroU16::get)
             .chain([0u16])
             .collect::<Vec<u16>>()
