@@ -1,7 +1,7 @@
 use crate::config::ip_source::Sources;
 use crate::config::{deserialize_from_file, CfgInner, Config};
 use crate::updaters::{Updater, UpdatersManager};
-use crate::{non_zero, util, DdnsContext, UserMessages};
+use crate::{non_zero, DdnsContext, UserMessages};
 use anyhow::Result;
 use anyhow::{anyhow, Context};
 use arc_swap::ArcSwap;
@@ -156,7 +156,7 @@ async fn listen(
 }
 
 pub async fn load() -> Result<(DdnsContext, UpdatersManager, ConfigStorage)> {
-    if !util::try_exists("./config").await? {
+    if !tokio::fs::try_exists("./config").await? {
         tokio::fs::create_dir_all("./config").await?;
     }
     if !tokio::fs::metadata("./config").await?.is_dir() {
@@ -166,7 +166,7 @@ pub async fn load() -> Result<(DdnsContext, UpdatersManager, ConfigStorage)> {
     macro_rules! exists_or_include {
         ($($name: literal),*) => {
             tokio::try_join!($(async {
-                if !util::try_exists(concat!("./config/", $name)).await? {
+                if !tokio::fs::try_exists(concat!("./config/", $name, ".toml")).await? {
                     tokio::fs::write(concat!("./config/", $name, ".toml"), include_str!(concat!("../../includes/", $name, ".toml"))).await?;
                 }
                 Ok::<_, io::Error>(())

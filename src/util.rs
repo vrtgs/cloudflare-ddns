@@ -2,11 +2,10 @@ use std::convert::Infallible;
 use std::fmt::{Display, Formatter, Write};
 use std::net::{self, Ipv4Addr};
 use std::num::NonZero;
-use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::{LazyLock, OnceLock};
+use std::thread;
 use std::time::Duration;
-use std::{io, thread};
 use thiserror::Error;
 use tokio::runtime::Handle as TokioHandle;
 use tokio::time::{Instant, Interval, MissedTickBehavior};
@@ -55,16 +54,6 @@ pub fn num_cpus() -> NonZero<usize> {
     }
 
     *NUM_CPUS.get_or_init(num_cpus_uncached)
-}
-
-pub async fn try_exists(path: impl AsRef<Path>) -> io::Result<bool> {
-    async fn inner(path: PathBuf) -> io::Result<bool> {
-        tokio::task::spawn_blocking(move || path.try_exists())
-            .await
-            .map_err(|e| io::Error::other(format!("background task failed: {e}")))?
-    }
-
-    inner(path.as_ref().to_owned()).await
 }
 
 pub fn new_skip_interval_after(period: Duration) -> Interval {
@@ -137,6 +126,8 @@ pub trait AddrParseExt: Sized {
 
 impl AddrParseExt for Ipv4Addr {
     fn parse_ascii_bytes(b: &[u8]) -> Result<Self, AddrParseError> {
+        let b = b.trim_ascii();
+
         if b.len() > b"xxx.xxx.xxx.xxx".len() {
             return Err(AddrParseError::TooLong);
         }

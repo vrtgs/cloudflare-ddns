@@ -1,5 +1,5 @@
 use std::borrow::Cow;
-use std::panic::PanicInfo;
+use std::panic::PanicHookInfo;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::thread;
@@ -62,7 +62,7 @@ mod sys {
 
     fn encode_wide(str: &OsStr) -> Vec<u16> {
         str.encode_wide()
-            .filter_map(NonZeroU16::new)
+            .map_while(NonZeroU16::new)
             .map(NonZeroU16::get)
             .chain([0u16])
             .collect::<Vec<u16>>()
@@ -326,7 +326,7 @@ pub async fn spawn_message_box(semaphore: Arc<Semaphore>, err: impl FnOnce() + S
     }
 }
 
-fn hook(info: &PanicInfo) {
+fn hook(info: &PanicHookInfo) {
     macro_rules! try_cast {
         ([$payload:expr] $type: ty $(, $rest: ty)* |> $default: expr) => {
             match $payload.downcast_ref::<$type>() {

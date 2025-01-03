@@ -38,6 +38,8 @@ pub enum GetIpError {
     InvalidIp(#[from] AddrParseError),
     #[error("There is no ip source to get our ip from")]
     NoIpSources,
+    #[error("All ip sources timed out")]
+    TimeOut(#[from] tokio::time::error::Elapsed),
 }
 
 #[derive(PartialOrd, PartialEq, Ord, Eq)]
