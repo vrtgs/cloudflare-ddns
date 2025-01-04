@@ -71,7 +71,6 @@ impl RetryingClient {
 
         let builder = ClientBuilder::new()
             .timeout(get!(timeout))
-            .hickory_dns(true)
             .pool_idle_timeout(get!(timeout).checked_mul(max_retries as u32 + 1))
             .pool_max_idle_per_host(get!(max_idle_per_host))
             .use_rustls_tls();
@@ -79,7 +78,6 @@ impl RetryingClient {
         #[cfg(feature = "trace")]
         let builder = builder
             .pool_idle_timeout(Duration::ZERO)
-            .hickory_dns(false)
             .pool_max_idle_per_host(0);
 
         builder
@@ -111,14 +109,9 @@ impl RetryingClient {
     }
 
     /// See [`Client::execute`]
-    pub async fn execute(&self, req: Request) -> reqwest::Result<Response> {
-        let mut i = 0_u8;
-        loop {
-            if i >= self.max_retries {
-                break;
-            }
-
-            if let Some(req) = req.try_clone() {
+    pub async fn execute(&self, request: Request) -> reqwest::Result<Response> {
+        for i in 0..self.max_retries.saturating_sub(1) {
+            if let Some(req) = request.try_clone() {
                 match self.client.execute(req).await {
                     Ok(resp) => return Ok(resp),
                     Err(_) => {
@@ -133,10 +126,8 @@ impl RetryingClient {
             } else {
                 abort_unreachable!("tried to use a streaming request");
             }
-
-            i += 1
         }
 
-        self.client.execute(req).await
+        self.client.execute(request).await
     }
 }

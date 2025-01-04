@@ -1,3 +1,4 @@
+use crate::addr_helper::IpType;
 use crate::config::Deserializable;
 use anyhow::Result;
 use reqwest::header::HeaderValue;
@@ -60,6 +61,7 @@ pub struct Zone {
     id: Box<str>,
     record: Box<str>,
     proxied: bool,
+    ip_type: IpType,
 }
 
 impl<'de> Deserialize<'de> for Zone {
@@ -74,12 +76,16 @@ impl<'de> Deserialize<'de> for Zone {
 
             #[serde(default)]
             proxied: bool,
+
+            #[serde(default)]
+            ip: IpType,
         }
 
         let ZoneInner {
             id,
             record,
             proxied,
+            ip,
         } = ZoneInner::deserialize(deserializer)?;
 
         let record = idna::domain_to_ascii(&record)
@@ -90,6 +96,7 @@ impl<'de> Deserialize<'de> for Zone {
             id,
             record,
             proxied,
+            ip_type: ip,
         })
     }
 }
@@ -104,6 +111,10 @@ impl Zone {
 
     pub fn proxied(&self) -> bool {
         self.proxied
+    }
+
+    pub fn ip_type(&self) -> IpType {
+        self.ip_type
     }
 }
 

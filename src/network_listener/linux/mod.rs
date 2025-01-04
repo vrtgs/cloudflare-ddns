@@ -1,6 +1,5 @@
+use crate::global_rt;
 use crate::updaters::Updater;
-use crate::util;
-use crate::util::GLOBAL_TOKIO_RUNTIME;
 use anyhow::Result;
 use dbus::nonblock::{Proxy, SyncConnection};
 use futures::{StreamExt, TryStreamExt};
@@ -13,6 +12,7 @@ use std::sync::{Arc, LazyLock};
 use std::thread;
 use std::time::Duration;
 use tempfile::TempPath;
+use tokio::fs;
 use tokio::net::UnixListener;
 use tokio::sync::OnceCell as TokioOnceCell;
 use tokio::task::JoinHandle;
@@ -41,7 +41,7 @@ async fn check_network_status() -> Result<bool, DbusError> {
     static NETWORK_MANAGER: LazyLock<Result<&SyncConnection, dbus::Error>> = LazyLock::new(|| {
         let (resource, conn) = dbus_tokio::connection::new_session_sync()?;
 
-        GLOBAL_TOKIO_RUNTIME.spawn(resource);
+        global_rt::spawn(resource);
 
         Ok(Arc::leak(conn))
     });
@@ -129,7 +129,7 @@ async fn listen(updater: &Updater) -> Result<()> {
 
     const SOCK: &str = include_str!("./socket-path");
 
-    if util::try_exists(SOCK).await? {
+    if fs::try_exists(SOCK).await? {
         tokio::fs::remove_file(SOCK).await?;
     }
     let sock = TempPath::from_path(SOCK);

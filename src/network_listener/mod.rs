@@ -4,8 +4,8 @@
 mod sys_common;
 
 use crate::dbg_println;
+use crate::time::new_skip_interval_after;
 use crate::updaters::{Updater, UpdatersManager};
-use crate::util::new_skip_interval_after;
 use ip_macro::ip;
 use std::convert::Infallible;
 use std::net::IpAddr;

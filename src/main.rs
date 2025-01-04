@@ -4,16 +4,18 @@ extern crate core;
 
 use crate::config::ip_source::GetIpError;
 use crate::config::Config;
+use crate::json::EscapeExt;
 use crate::network_listener::has_internet;
+use crate::one_or_more::OneOrMore;
 use crate::retrying_client::RetryingClient;
+use crate::time::new_skip_interval;
 use crate::updaters::{UpdaterEvent, UpdaterExitStatus};
-use crate::util::{new_skip_interval, EscapeExt};
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result};
 use futures::StreamExt;
 use serde::Deserialize;
 use std::borrow::Cow;
 use std::cell::Cell;
-use std::net::Ipv4Addr;
+use std::net::IpAddr;
 use std::num::NonZeroU8;
 use std::panic::AssertUnwindSafe;
 use std::pin::pin;
@@ -25,16 +27,21 @@ use std::time::Duration;
 use tokio::sync::Semaphore;
 use tokio::try_join;
 
+mod addr_helper;
 mod config;
 mod console_listener;
 mod err;
+mod global_rt;
+mod json;
 mod network_listener;
+mod num_cpus;
+mod one_or_more;
 mod pre;
 mod retrying_client;
+mod time;
 mod updaters;
-mod util;
 
-struct DdnsContext {
+struct DDNSContext {
     client: RetryingClient,
     user_messages: UserMessages,
 }
@@ -42,18 +49,22 @@ struct DdnsContext {
 #[derive(Debug)]
 struct Record {
     id: Box<str>,
-    ip: Ipv4Addr,
+    ip: IpAddr,
 }
 
-impl DdnsContext {
+impl DDNSContext {
     fn new(cfg: Config) -> Self {
-        DdnsContext {
+        DDNSContext {
             client: RetryingClient::new(&cfg),
             user_messages: UserMessages::new(cfg.misc().general().max_errors()),
         }
     }
 
-    async fn get_ip(&self, cfg: &Config) -> Result<Ipv4Addr> {
+    async fn get_ip_stream<T>(
+        &self,
+        cfg: &Config,
+        mut filter: impl FnMut(IpAddr) -> Option<T>,
+    ) -> Result<T> {
         let last_err = Cell::new(None);
 
         let iter = cfg.ip_sources().map(|x| x.resolve_ip(&self.client, cfg));
@@ -72,41 +83,54 @@ impl DdnsContext {
             });
 
         pin!(stream)
+            .filter_map(|ip| std::future::ready(filter(ip)))
             .next()
             .await
             .ok_or_else(|| last_err.take().unwrap_or(GetIpError::NoIpSources).into())
     }
 
-    async fn get_record(&self, cfg: &Config) -> Result<Record> {
-        let url = format!(
-            "https://api.cloudflare.com/client/v4/zones/{zone_id}/dns_records?type=A&name={record}",
-            zone_id = cfg.zone().id(),
-            record = cfg.zone().record()
-        );
+    async fn get_ip(&self, cfg: &Config) -> Result<IpAddr> {
+        let ip_type = cfg.zone().ip_type();
+        self.get_ip_stream(cfg, move |ip| ip_type.filter(ip)).await
+    }
 
+    async fn get_record(&self, cfg: &Config) -> Result<Record> {
         #[derive(Debug, Deserialize)]
-        struct FullATypeRecord {
+        struct FullIpTypeRecord {
             id: Box<str>,
             name: Box<str>,
             #[serde(rename = "content")]
-            ip: Ipv4Addr,
+            ip: IpAddr,
         }
 
         #[derive(Debug, Deserialize)]
         pub struct GetResponse {
-            result: Vec<FullATypeRecord>,
+            result: OneOrMore<FullIpTypeRecord>,
         }
 
-        let records = cfg
-            .authorize_request(self.client.get(url))
-            .send()
-            .await?
-            .json::<GetResponse>()
-            .await?
-            .result;
+        async fn get(this: &DDNSContext, cfg: &Config, record_type: &str) -> Result<GetResponse> {
+            let url = format!(
+                "https://api.cloudflare.com/client/v4/zones/{zone_id}/dns_records?type={record_type}&name={record}",
+                zone_id = cfg.zone().id(),
+                record = cfg.zone().record()
+            );
 
-        let [FullATypeRecord { id, ip, name }] = <[FullATypeRecord; 1]>::try_from(records)
-            .map_err(|vec| anyhow!("expected 1 record got {} records: {vec:?}", vec.len()))?;
+            cfg.authorize_request(this.client.get(url))
+                .send()
+                .await?
+                .json::<GetResponse>()
+                .await
+                .map_err(Into::into)
+        }
+
+        let get =
+            |record_type| async move { get(self, cfg, record_type).await.map(|res| res.result) };
+
+        let FullIpTypeRecord { id, ip, name } = tokio::select! {
+            Ok(OneOrMore::One(record)) = get("A") => record,
+            Ok(OneOrMore::One(record)) = get("AAAA") => record,
+            else => anyhow::bail!("couldn't find any matching IPv(4/6) records in cloudflare")
+        };
 
         anyhow::ensure!(
             &*name == cfg.zone().record(),
@@ -117,9 +141,13 @@ impl DdnsContext {
         Ok(Record { id, ip })
     }
 
-    async fn update_record(&self, id: &str, ip: Ipv4Addr, cfg: &Config) -> Result<()> {
+    async fn update_record(&self, id: &str, ip: IpAddr, cfg: &Config) -> Result<()> {
         let request_json = format! {
-            r###"{{"type":"A","name":"{record}","content":"{ip}","proxied":{proxied}}}"###,
+            r###"{{"type":"{record_type}","name":"{record}","content":"{ip}","proxied":{proxied}}}"###,
+            record_type = match ip {
+                IpAddr::V4(_) => "A",
+                IpAddr::V6(_) => "AAAA"
+            },
             record = cfg.zone().record().escape_json(),
             proxied = cfg.zone().proxied()
         };
@@ -264,7 +292,7 @@ fn make_runtime() -> tokio::runtime::Handle {
 #[cfg(not(feature = "trace"))]
 fn make_runtime() -> tokio::runtime::Runtime {
     tokio::runtime::Builder::new_multi_thread()
-        .worker_threads(util::num_cpus().get())
+        .worker_threads(num_cpus::num_cpus().get())
         .enable_all()
         .build()
         .expect("failed to build runtime")

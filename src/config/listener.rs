@@ -1,7 +1,7 @@
 use crate::config::ip_source::Sources;
 use crate::config::{deserialize_from_file, CfgInner, Config};
 use crate::updaters::{Updater, UpdatersManager};
-use crate::{non_zero, DdnsContext, UserMessages};
+use crate::{non_zero, DDNSContext, UserMessages};
 use anyhow::Result;
 use anyhow::{anyhow, Context};
 use arc_swap::ArcSwap;
@@ -155,7 +155,7 @@ async fn listen(
     anyhow::Ok(false)
 }
 
-pub async fn load() -> Result<(DdnsContext, UpdatersManager, ConfigStorage)> {
+pub async fn load() -> Result<(DDNSContext, UpdatersManager, ConfigStorage)> {
     if !tokio::fs::try_exists("./config").await? {
         tokio::fs::create_dir_all("./config").await?;
     }
@@ -210,7 +210,7 @@ pub async fn load() -> Result<(DdnsContext, UpdatersManager, ConfigStorage)> {
     let cfg_store = Arc::new(ArcSwap::new(Arc::clone(&cfg)));
     let cfg_weak = Arc::downgrade(&cfg_store);
 
-    let ctx = DdnsContext::new(Config(cfg));
+    let ctx = DDNSContext::new(Config(cfg));
     let user_messages = ctx.user_messages.clone();
     let mut updater_manager = UpdatersManager::new();
 

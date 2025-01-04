@@ -89,12 +89,12 @@ async fn make_default_sources_rs() -> io::Result<()> {
 
 async fn generate_dispatcher() -> io::Result<()> {
     macro_rules! get_var {
-        ($lit: literal) => {
+        ($lit: literal) => {{
+            println!("cargo::rerun-if-env-changed={}", $lit);
             env::var($lit).map_err(|e| io::Error::other(format!(concat!($lit, " {err}"), err = e)))
-        };
+        }};
     }
 
-    println!("cargo::rerun-if-env-changed=CARGO_CFG_TARGET_OS");
     if get_var!("CARGO_CFG_TARGET_OS")? == "linux" {
         println!("cargo::rerun-if-changed=modules/linux-dispatcher");
         println!("cargo::rerun-if-changed=src/network_listener/linux/dispatcher");
@@ -103,7 +103,7 @@ async fn generate_dispatcher() -> io::Result<()> {
         let target = target.trim();
 
         Command::new("cargo")
-            .stdout(Stdio::null())
+            .stdout(Stdio::from(io::stderr()))
             .stderr(Stdio::inherit())
             .args(["build", "--profile", "linux-dispatcher", "--target", target])
             .current_dir("./modules/linux-dispatcher")
@@ -118,12 +118,19 @@ async fn generate_dispatcher() -> io::Result<()> {
 
             Command::new("upx")
                 .args(["--best", &*path])
+                .stdout(Stdio::from(io::stderr()))
+                .stderr(Stdio::inherit())
                 .status()
-                .await?
+                .await
+                .map_err(|err| {
+                    io::Error::other(format!(
+                        "failed to run upx make sure upx is installed; {err}"
+                    ))
+                })?
                 .success()
                 .then_some(())
                 .ok_or_else(|| {
-                    io::Error::other("failed to pack linux-dispatcher, make sure upx is installed")
+                    io::Error::other("UPX failed to run successfully on linux-dispatcher")
                 })?;
 
             tokio::fs::try_exists(&path)

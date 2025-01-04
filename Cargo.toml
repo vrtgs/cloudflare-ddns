@@ -43,32 +43,30 @@ trace = ["tokio/tracing", "dep:console-subscriber"]
 
 
 [dependencies]
-tokio                 = { version = "1.40.0", features = ["full"] }
-futures               = { version = "0.3.30"}
-serde                 = { version = "1.0.210", features = ["derive", "rc"] }
-anyhow                = { version = "1.0.89", features = ["backtrace"] }
+tokio                 = { version = "1.42.0", features = ["full"] }
+futures               = { version = "0.3.31"}
+serde                 = { version = "1.0.217", features = ["derive", "rc"] }
+anyhow                = { version = "1.0.95", features = ["backtrace"] }
 ip_macro              = { version = "*", path = "./modules/ip_macro" }
-console-subscriber    = { version = "0.4.0", optional = true }
-clap                  = { version = "4.5.18", features = ["derive"] }
+console-subscriber    = { version = "0.4.1", optional = true }
 simdutf8              = "0.1.5"
+url                   = "2.5.4"
 toml                  = "0.8.19"
 serde_json            = "1.0.128"
-bytes                 = "1.7.0"
-thiserror             = "1.0.63"
+bytes                 = "1.9.0"
+thiserror             = "2.0.9"
 ahash                 = "0.8.11"
-url                   = "2.5.2"
 arc-swap              = "1.7.1"
 notify                = "6.1.1"
 notify-debouncer-full = "0.3.1"
 idna                  = "1.0.2"
 
 [dependencies.reqwest]
-version = "0.12.7"
+version = "0.12.12"
 default-features = false
 features = [
     "charset",
     "http2",
-    "hickory-dns",
     "macos-system-configuration",
     "stream",
     "rustls-tls-native-roots",
@@ -117,4 +115,4 @@ core-foundation-sys  = "0.8.6"
 system-configuration = "0.6.1"
 
 [build-dependencies]
-tokio = { version = "1.40.0", features = ["rt", "macros", "fs", "io-util", "process"] }
+tokio = { version = "1.42.0", features = ["rt", "macros", "fs", "io-util", "process"] }
