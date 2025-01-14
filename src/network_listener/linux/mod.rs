@@ -74,9 +74,9 @@ async fn check_network_status() -> Result<bool, DbusError> {
 }
 
 pub async fn has_internet() -> bool {
-    static SUPPORT_NETWORK_MANAGER: TokioOnceCell<bool> = TokioOnceCell::const_new();
+    static SUPPORTS_NETWORK_MANAGER: TokioOnceCell<bool> = TokioOnceCell::const_new();
 
-    match SUPPORT_NETWORK_MANAGER
+    match SUPPORTS_NETWORK_MANAGER
         .get_or_init(|| async { check_network_status().await.is_ok() })
         .await
     {
@@ -106,7 +106,7 @@ async fn place_dispatcher() -> Result<()> {
                         .create_new(true)
                         .mode(0o777)
                         .open(location)?
-                        .write_all(include_bytes!("./dispatcher"))?;
+                        .write_all(include_bytes!(concat!(env!("OUT_DIR"), "/dispatcher-bin")))?;
                 }
             }
             Ok(())

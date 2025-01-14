@@ -1,4 +1,5 @@
 use std::fmt::{Debug, Display, Formatter, Write};
+use std::path::PathBuf;
 use std::process::Stdio;
 use std::{env, io};
 use tokio::fs::File;
@@ -113,7 +114,7 @@ async fn generate_dispatcher() -> io::Result<()> {
             .then_some(())
             .ok_or_else(|| io::Error::other("failed to run dispatcher build command"))?;
 
-        let target_path = {
+        let bin_path = {
             let path = format!("./target/{target}/linux-dispatcher/linux-dispatcher");
 
             Command::new("upx")
@@ -139,7 +140,11 @@ async fn generate_dispatcher() -> io::Result<()> {
                 .ok_or_else(|| io::Error::other("unable to find dispatcher binary"))?
         };
 
-        tokio::fs::rename(target_path, "./src/network_listener/linux/dispatcher").await?;
+        tokio::fs::copy(
+            bin_path,
+            PathBuf::from(get_var!("OUT_DIR")?).join("./dispatcher-bin"),
+        )
+        .await?;
     }
 
     Ok(())

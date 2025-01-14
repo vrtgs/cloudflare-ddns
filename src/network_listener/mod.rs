@@ -9,6 +9,7 @@ use crate::updaters::{Updater, UpdatersManager};
 use ip_macro::ip;
 use std::convert::Infallible;
 use std::net::IpAddr;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use tokio::net::TcpStream;
 use tokio::sync::Notify;
@@ -28,6 +29,12 @@ pub fn subscribe(updaters_manager: &mut UpdatersManager) -> Result<(), Infallibl
 
 #[allow(dead_code)]
 async fn fallback_has_internet() -> bool {
+    static USED_FALLBACK_YET: AtomicBool = AtomicBool::new(false);
+
+    if !USED_FALLBACK_YET.swap(true, Ordering::Relaxed) {
+        dbg_println!("running fallback internet, couldn't use native methods of internet checking")
+    }
+
     macro_rules! test_internet_from {
         ($([$name: ident, $ip: expr])*) => {{
             const IPS: [IpAddr; 8] = [$($ip),*];

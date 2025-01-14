@@ -5,7 +5,7 @@ use crate::{non_zero, DDNSContext, UserMessages};
 use anyhow::Result;
 use anyhow::{anyhow, Context};
 use arc_swap::ArcSwap;
-use notify::{RecommendedWatcher, RecursiveMode, Watcher};
+use notify::{RecommendedWatcher, RecursiveMode};
 use notify_debouncer_full::{
     new_debouncer_opt, DebounceEventHandler, DebounceEventResult, FileIdMap,
 };
@@ -59,13 +59,11 @@ async fn listen(
             notify::Config::default().with_compare_contents(true),
         )?;
 
-        watcher.watcher().watch(
+        watcher.watch(
             Path::new("./config/sources.toml"),
             RecursiveMode::NonRecursive,
         )?;
-        watcher
-            .watcher()
-            .watch(Path::new("./config/api.toml"), RecursiveMode::NonRecursive)?;
+        watcher.watch(Path::new("./config/api.toml"), RecursiveMode::NonRecursive)?;
         anyhow::Ok(watcher)
     })
     .await??;
