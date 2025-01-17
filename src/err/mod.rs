@@ -11,7 +11,7 @@ pub mod exit;
 #[macro_export]
 macro_rules! dbg_println {
     ($($arg:tt)*) => {
-        { #[cfg(debug_assertions)] { eprintln!($($arg)*) } }
+        { { eprintln!($($arg)*) } }
     };
 }
 

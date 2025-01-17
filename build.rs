@@ -103,6 +103,8 @@ async fn generate_dispatcher() -> io::Result<()> {
         let target = get_var!("TARGET")?;
         let target = target.trim();
 
+        tokio::fs::remove_dir_all(format!("./target/{target}/linux-dispatcher")).await?;
+        
         Command::new("cargo")
             .stdout(Stdio::from(io::stderr()))
             .stderr(Stdio::inherit())
