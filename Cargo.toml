@@ -118,3 +118,4 @@ system-configuration = "0.6.1"
 
 [build-dependencies]
 tokio = { version = "1.43.0", features = ["rt", "macros", "fs", "io-util", "process"] }
+anyhow = "1.0.95"

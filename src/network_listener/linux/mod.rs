@@ -4,13 +4,13 @@ use anyhow::Result;
 use dbus::nonblock::{Proxy, SyncConnection};
 use futures::{StreamExt, TryStreamExt};
 use std::fs::OpenOptions;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::num::NonZero;
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::Path;
 use std::sync::{Arc, LazyLock};
-use std::thread;
 use std::time::Duration;
+use std::{io, thread};
 use tempfile::TempPath;
 use tokio::fs;
 use tokio::net::UnixListener;
@@ -92,6 +92,8 @@ pub async fn has_internet() -> bool {
 }
 
 async fn place_dispatcher() -> Result<()> {
+    const DISPATCHER: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/dispatcher-bin"));
+
     let locations = include!("./dispatcher-locations")
         .map(Path::new)
         .map(|loc| loc.join(include_str!("./dispatcher-name")));
@@ -99,14 +101,43 @@ async fn place_dispatcher() -> Result<()> {
     let futures = locations.map(|location| async move {
         tokio::task::spawn_blocking(move || {
             if let Some(parent) = location.parent() {
-                if !location.try_exists()? && parent.try_exists()? {
+                let eq_contents = |loc: &Path| {
+                    let file = io::BufReader::new(std::fs::File::open(loc)?);
+
+                    enum CmpErr {
+                        Io(io::Error),
+                        Cmp,
+                    }
+
+                    let mut dispatcher_bytes = DISPATCHER.iter();
+                    let res = file.bytes().try_fold((), |(), byte| {
+                        byte.map_err(CmpErr::Io).and_then(|byte| {
+                            match Some(byte) == dispatcher_bytes.next().copied() {
+                                true => Ok(()),
+                                false => Err(CmpErr::Cmp),
+                            }
+                        })
+                    });
+
+                    let eq = match res {
+                        Ok(()) => true,
+                        Err(CmpErr::Cmp) => false,
+                        Err(CmpErr::Io(io)) => return Err(io),
+                    };
+
+                    Ok(eq && dispatcher_bytes.as_slice().is_empty())
+                };
+                let invalid =
+                    |loc: &Path| Ok::<_, io::Error>(!loc.try_exists()? || eq_contents(loc)?);
+
+                if invalid(&location)? && parent.try_exists()? {
                     OpenOptions::new()
                         .read(true)
                         .write(true)
                         .create_new(true)
                         .mode(0o777)
                         .open(location)?
-                        .write_all(include_bytes!(concat!(env!("OUT_DIR"), "/dispatcher-bin")))?;
+                        .write_all(DISPATCHER)?;
                 }
             }
             Ok(())

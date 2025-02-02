@@ -19,25 +19,26 @@ macro_rules! json_sources {
     };
 }
 
-async fn make_default_sources_toml() -> io::Result<()> {
+async fn make_default_sources_toml() -> anyhow::Result<()> {
     let mut data = String::new();
 
     let plain_sources = plaintext_sources!();
     for source in plain_sources {
-        writeln!(data, r#"["{source}"]"#).unwrap();
-        writeln!(data, "steps = [\"Plaintext\"]\n").unwrap();
+        writeln!(data, r#"["{source}"]"#)?;
+        writeln!(data, "steps = [\"Plaintext\"]\n")?;
     }
 
     let plain_sources = json_sources!();
     for (source, key) in plain_sources {
-        writeln!(data, r#"["{source}"]"#).unwrap();
-        writeln!(data, r#"steps = [{{ Json = {{ key = "{key}" }} }}]"#).unwrap();
+        writeln!(data, r#"["{source}"]"#)?;
+        writeln!(data, r#"steps = [{{ Json = {{ key = "{key}" }} }}]"#)?;
     }
 
-    tokio::fs::write("includes/sources.toml", data.trim()).await
+    tokio::fs::write("includes/sources.toml", data.trim()).await?;
+    Ok(())
 }
 
-async fn make_default_sources_rs() -> io::Result<()> {
+async fn make_default_sources_rs() -> anyhow::Result<()> {
     let mut file = BufWriter::new(File::create("includes/sources.array").await?);
 
     #[derive(Clone)]
@@ -85,10 +86,12 @@ async fn make_default_sources_rs() -> io::Result<()> {
 
     file.write_all(format!("{sources:?}").0.as_bytes()).await?;
 
-    file.flush().await
+    file.flush().await?;
+
+    Ok(())
 }
 
-async fn generate_dispatcher() -> io::Result<()> {
+async fn generate_dispatcher() -> anyhow::Result<()> {
     macro_rules! get_var {
         ($lit: literal) => {{
             println!("cargo::rerun-if-env-changed={}", $lit);
@@ -103,8 +106,6 @@ async fn generate_dispatcher() -> io::Result<()> {
         let target = get_var!("TARGET")?;
         let target = target.trim();
 
-        tokio::fs::remove_dir_all(format!("./target/{target}/linux-dispatcher")).await?;
-        
         Command::new("cargo")
             .stdout(Stdio::from(io::stderr()))
             .stderr(Stdio::inherit())
