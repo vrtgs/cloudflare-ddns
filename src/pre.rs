@@ -1,23 +1,60 @@
 use crate::err;
 
 #[cfg(unix)]
-fn ensure_root() {
+fn rerun_as_root() {
     use nix::unistd::Uid;
-    use std::convert::Infallible;
-    use std::io;
     use std::os::unix::process::CommandExt;
 
-    if !Uid::effective().is_root() {
-        fn elevate() -> io::Result<Infallible> {
-            let err = std::process::Command::new("sudo")
-                // contains exe path
-                .args(std::env::args_os())
-                .exec();
-            Err(err)
-        }
-
-        elevate().unwrap_or_else(|e| crate::abort!("{e}"));
+    if Uid::effective().is_root() {
+        return;
     }
+
+    let err = std::process::Command::new("sudo")
+        // contains exe path
+        .args(std::env::args_os())
+        .exec();
+
+    crate::abort!("{err}");
+}
+
+#[cfg(target_os = "linux")]
+pub fn ensure_dbus_session() {
+    use std::os::unix::process::CommandExt;
+
+    if std::env::var_os("DBUS_SESSION_BUS_ADDRESS").is_some() {
+        return;
+    }
+
+    macro_rules! tri {
+        ($e:expr) => {
+            match $e {
+                Ok(x) => x,
+                // Silently continue if dbus-launch fails
+                Err(_) => return,
+            }
+        };
+    }
+
+    let output = tri!(std::process::Command::new("dbus-launch").output());
+
+    let stdout = tri!(String::from_utf8(output.stdout));
+    let envs = stdout
+        .lines()
+        .flat_map(|s| s.split_once('='))
+        .collect::<Vec<_>>();
+
+    assert!(envs
+        .iter()
+        .any(|&(k, _)| k.eq_ignore_ascii_case("DBUS_SESSION_BUS_ADDRESS")));
+
+    // first arg is program path
+    let mut args = std::env::args_os();
+    let err = std::process::Command::new(args.next().unwrap())
+        .args(args)
+        .envs(envs)
+        .exec();
+
+    crate::abort!("{err}")
 }
 
 fn set_working_dir() {
@@ -36,7 +73,7 @@ fn set_working_dir() {
 
 #[cfg(target_os = "macos")]
 fn add_to_startup() {
-    ensure_root();
+    rerun_as_root();
 
     fn inner() -> std::io::Result<()> {
         const LAUNCHD_FILE: &str = "/Library/LaunchDaemons/xyz.vrtgs.cloudflare-ddns.plist";
@@ -87,7 +124,7 @@ fn add_to_startup() {
 
 #[cfg(target_os = "macos")]
 fn remove_from_startup() {
-    ensure_root();
+    rerun_as_root();
 
     fn inner() -> std::io::Result<()> {
         const LAUNCHD_FILE: &str = "/Library/LaunchDaemons/xyz.vrtgs.cloudflare-ddns.plist";
@@ -130,8 +167,12 @@ fn make_config() {
 
 pub fn pre_run() {
     err::set_hook();
+
     #[cfg(target_os = "linux")]
-    ensure_root();
+    rerun_as_root();
+
+    #[cfg(target_os = "linux")]
+    ensure_dbus_session();
 
     set_working_dir();
 

@@ -1,6 +1,7 @@
+use crate::addr_helper::{AddrParseError, AddrParseExt};
 use crate::config::{Config, Deserializable};
+use crate::num_cpus::num_cpus;
 use crate::retrying_client::RetryingClient;
-use crate::util::{num_cpus, AddrParseError, AddrParseExt};
 use crate::{abort_unreachable, non_zero};
 use anyhow::Result;
 use bytes::Bytes;
@@ -15,8 +16,8 @@ use std::collections::BTreeMap;
 use std::convert::Infallible;
 use std::fmt::{Debug, Formatter, Write};
 use std::future::Future;
-use std::net::Ipv4Addr;
-use std::num::NonZeroU8;
+use std::net::IpAddr;
+use std::num::NonZero;
 use std::ops::Deref;
 use std::pin::pin;
 use std::sync::Arc;
@@ -38,6 +39,8 @@ pub enum GetIpError {
     InvalidIp(#[from] AddrParseError),
     #[error("There is no ip source to get our ip from")]
     NoIpSources,
+    #[error("All ip sources timed out")]
+    TimeOut(#[from] tokio::time::error::Elapsed),
 }
 
 #[derive(PartialOrd, PartialEq, Ord, Eq)]
@@ -179,7 +182,7 @@ struct Process {
 }
 
 impl Process {
-    async fn run(&self, mut bytes: Bytes, _cfg: &Config) -> Result<Ipv4Addr, GetIpError> {
+    async fn run(&self, mut bytes: Bytes, _cfg: &Config) -> Result<IpAddr, GetIpError> {
         use ProcessStep as S;
         for step in &*self.steps {
             match step {
@@ -209,7 +212,7 @@ impl Process {
             }
         }
 
-        Ok(Ipv4Addr::parse_ascii_bytes(&bytes)?)
+        Ok(IpAddr::parse_ascii_bytes(&bytes)?)
     }
 }
 
@@ -244,13 +247,13 @@ async fn into_process(mut steps: Vec<ProcessStep>) -> Process {
 #[derive(PartialOrd, PartialEq, Ord, Eq)]
 pub struct Sources {
     sources: BTreeMap<Url, Process>,
-    pub(crate) concurrent_resolve: NonZeroU8,
+    pub(crate) concurrent_resolve: NonZero<u8>,
 }
 
 impl Sources {
     pub async fn from_try_iter<I, Url, Steps, E>(
         iter: I,
-        concurrent_resolve: Option<NonZeroU8>,
+        concurrent_resolve: Option<NonZero<u8>>,
     ) -> Result<Self>
     where
         I: IntoIterator<Item = Result<(Url, Steps), E>>,
@@ -278,14 +281,14 @@ impl Sources {
                     num_cpus()
                         .saturating_mul(non_zero!(4))
                         .try_into()
-                        .unwrap_or(NonZeroU8::MAX)
+                        .unwrap_or(NonZero::<u8>::MAX)
                 }),
             })
     }
 
     pub async fn from_iter<I, Url, Steps>(
         iter: I,
-        concurrent_resolve: Option<NonZeroU8>,
+        concurrent_resolve: Option<NonZero<u8>>,
     ) -> Result<Self>
     where
         I: IntoIterator<Item = (Url, Steps)>,
@@ -332,7 +335,7 @@ impl Deserializable for Sources {
 
         get_field!(
             concurrent_resolve: ["concurrent-resolve", "concurrent_resolve"] => |key, val|
-                NonZeroU8::new(val.try_into::<u8>()?).ok_or_else(|| anyhow::anyhow!("{key} can't be zero"))?
+                NonZero::<u8>::new(val.try_into::<u8>()?).ok_or_else(|| anyhow::anyhow!("{key} can't be zero"))?
         );
 
         Self::from_try_iter(
@@ -393,8 +396,8 @@ impl IpSource {
         self,
         client: &RetryingClient,
         cfg: &Config,
-    ) -> Result<Ipv4Addr, GetIpError> {
-        let bytes = client.get(self.url).send().await?.bytes().await?;
+    ) -> Result<IpAddr, GetIpError> {
+        let bytes = client.get(self.url.clone()).send().await?.bytes().await?;
         self.process.run(bytes, cfg).await
     }
 }

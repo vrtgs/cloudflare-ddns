@@ -1,11 +1,11 @@
 use crate::config::ip_source::Sources;
 use crate::config::{deserialize_from_file, CfgInner, Config};
 use crate::updaters::{Updater, UpdatersManager};
-use crate::{non_zero, util, DdnsContext, UserMessages};
+use crate::{non_zero, DDNSContext, UserMessages};
 use anyhow::Result;
 use anyhow::{anyhow, Context};
 use arc_swap::ArcSwap;
-use notify::{RecommendedWatcher, RecursiveMode, Watcher};
+use notify::{RecommendedWatcher, RecursiveMode};
 use notify_debouncer_full::{
     new_debouncer_opt, DebounceEventHandler, DebounceEventResult, FileIdMap,
 };
@@ -59,13 +59,11 @@ async fn listen(
             notify::Config::default().with_compare_contents(true),
         )?;
 
-        watcher.watcher().watch(
+        watcher.watch(
             Path::new("./config/sources.toml"),
             RecursiveMode::NonRecursive,
         )?;
-        watcher
-            .watcher()
-            .watch(Path::new("./config/api.toml"), RecursiveMode::NonRecursive)?;
+        watcher.watch(Path::new("./config/api.toml"), RecursiveMode::NonRecursive)?;
         anyhow::Ok(watcher)
     })
     .await??;
@@ -155,8 +153,8 @@ async fn listen(
     anyhow::Ok(false)
 }
 
-pub async fn load() -> Result<(DdnsContext, UpdatersManager, ConfigStorage)> {
-    if !util::try_exists("./config").await? {
+pub async fn load() -> Result<(DDNSContext, UpdatersManager, ConfigStorage)> {
+    if !tokio::fs::try_exists("./config").await? {
         tokio::fs::create_dir_all("./config").await?;
     }
     if !tokio::fs::metadata("./config").await?.is_dir() {
@@ -166,7 +164,7 @@ pub async fn load() -> Result<(DdnsContext, UpdatersManager, ConfigStorage)> {
     macro_rules! exists_or_include {
         ($($name: literal),*) => {
             tokio::try_join!($(async {
-                if !util::try_exists(concat!("./config/", $name)).await? {
+                if !tokio::fs::try_exists(concat!("./config/", $name, ".toml")).await? {
                     tokio::fs::write(concat!("./config/", $name, ".toml"), include_str!(concat!("../../includes/", $name, ".toml"))).await?;
                 }
                 Ok::<_, io::Error>(())
@@ -210,7 +208,7 @@ pub async fn load() -> Result<(DdnsContext, UpdatersManager, ConfigStorage)> {
     let cfg_store = Arc::new(ArcSwap::new(Arc::clone(&cfg)));
     let cfg_weak = Arc::downgrade(&cfg_store);
 
-    let ctx = DdnsContext::new(Config(cfg));
+    let ctx = DDNSContext::new(Config(cfg));
     let user_messages = ctx.user_messages.clone();
     let mut updater_manager = UpdatersManager::new();
 
