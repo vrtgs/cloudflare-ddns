@@ -311,7 +311,7 @@ dependencies = [
  "toml",
  "url",
  "windows",
- "windows-core",
+ "windows-core 0.60.0",
  "windows-implement",
 ]
 
@@ -2626,7 +2626,7 @@ version = "0.59.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f919aee0a93304be7f62e8e5027811bbba96bcb1de84d6618be56e43f8a32a1"
 dependencies = [
- "windows-core",
+ "windows-core 0.59.0",
  "windows-targets 0.53.0",
 ]
 
@@ -2641,6 +2641,19 @@ dependencies = [
  "windows-result",
  "windows-strings",
  "windows-targets 0.53.0",
+]
+
+[[package]]
+name = "windows-core"
+version = "0.60.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d123ac68f52002d117257ed6afc7d6b6e2197b1b2b29e6c45e4309e6a2b2cf47"
+dependencies = [
+ "windows-implement",
+ "windows-interface",
+ "windows-link",
+ "windows-result",
+ "windows-strings",
 ]
 
 [[package]]
@@ -2664,6 +2677,12 @@ dependencies = [
  "quote",
  "syn",
 ]
+
+[[package]]
+name = "windows-link"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "76840935b766e1b0a05c0066835fb9ec80071d4c09a16f6bd5f7e655e3c14c38"
 
 [[package]]
 name = "windows-registry"
