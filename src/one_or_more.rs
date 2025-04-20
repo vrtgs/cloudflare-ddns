@@ -4,7 +4,18 @@ use serde::{Deserialize, Deserializer};
 pub enum OneOrMore<T> {
     Zero,
     One(T),
-    More(()),
+    More,
+}
+
+impl<T> OneOrMore<T> {
+    pub fn extend(self, other: Self) -> Self {
+        match (self, other) {
+            (OneOrMore::Zero, OneOrMore::Zero) => OneOrMore::Zero,
+            (OneOrMore::One(x), OneOrMore::Zero)
+            | (OneOrMore::Zero, OneOrMore::One(x)) => OneOrMore::One(x),
+            _ => OneOrMore::More
+        }
+    }
 }
 
 impl<'de, T> Deserialize<'de> for OneOrMore<T>
@@ -23,7 +34,7 @@ where
                 let [one] = <[T; 1]>::try_from(vec).ok().unwrap();
                 Self::One(one)
             }
-            _ => Self::More(()),
+            _ => Self::More,
         })
     }
 }

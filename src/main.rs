@@ -10,7 +10,7 @@ use crate::one_or_more::OneOrMore;
 use crate::retrying_client::RetryingClient;
 use crate::time::new_skip_interval;
 use crate::updaters::{UpdaterEvent, UpdaterExitStatus};
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use futures::StreamExt;
 use serde::Deserialize;
 use std::borrow::Cow;
@@ -25,7 +25,8 @@ use std::thread;
 use std::thread::Builder;
 use std::time::Duration;
 use tokio::sync::Semaphore;
-use tokio::try_join;
+use tokio::{join, try_join};
+use crate::addr_helper::IpType;
 
 mod addr_helper;
 mod config;
@@ -126,10 +127,25 @@ impl DDNSContext {
         let get =
             |record_type| async move { get(self, cfg, record_type).await.map(|res| res.result) };
 
-        let FullIpTypeRecord { id, ip, name } = tokio::select! {
-            Ok(OneOrMore::One(record)) = get("A") => record,
-            Ok(OneOrMore::One(record)) = get("AAAA") => record,
-            else => anyhow::bail!("couldn't find any matching IPv(4/6) records in cloudflare")
+        let FullIpTypeRecord { id, ip, name } = {
+            let records = match cfg.zone().ip_type() {
+                IpType::Any => {
+                    let (v4, v6) = join!(get("A"), get("AAAA"));
+                    match (v4, v6) {
+                        (Err(err1), Err(err2)) => bail!(err1.context(err2)),
+                        (Ok(record1), Ok(record2)) => record1.extend(record2),
+                        (Ok(record), Err(_)) | (Err(_), Ok(record)) => record
+                    }
+                }
+                IpType::V6 => get("A").await?,
+                IpType::V4 => get("AAAA").await?
+            };
+            
+            match records {
+                OneOrMore::Zero => bail!("found zero corresponding records {}", cfg.zone().record()),
+                OneOrMore::More => bail!("found too many corresponding records for {}", cfg.zone().record()),
+                OneOrMore::One(record) => record,
+            }
         };
 
         anyhow::ensure!(
@@ -180,7 +196,7 @@ impl DDNSContext {
             .with_context(|| "unable to deserialize patch response json")?;
 
         if failure || !response.success {
-            anyhow::bail!("Bad response: {}", String::from_utf8_lossy(&bytes))
+            bail!("Bad response: {}", String::from_utf8_lossy(&bytes))
         }
 
         Ok(())
