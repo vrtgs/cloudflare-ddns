@@ -24,7 +24,7 @@ trait ArcExt<T> {
 impl<T> ArcExt<T> for Arc<T> {
     fn leak(this: Self) -> &'static T {
         // since we don't decrement this counter,
-        // it will always be greater than 1 therefore the allocation is valid
+        // it will always be greater than 1, therefore, the allocation is valid
         unsafe { &*Arc::into_raw(this) }
     }
 }
@@ -127,6 +127,7 @@ async fn place_dispatcher() -> Result<()> {
 
                     Ok(eq && dispatcher_bytes.as_slice().is_empty())
                 };
+                
                 let invalid =
                     |loc: &Path| Ok::<_, io::Error>(!loc.try_exists()? || eq_contents(loc)?);
 
@@ -135,7 +136,7 @@ async fn place_dispatcher() -> Result<()> {
                         .read(true)
                         .write(true)
                         .create_new(true)
-                        .mode(0o777)
+                        .mode(0o555)
                         .open(location)?
                         .write_all(DISPATCHER)?;
                 }
