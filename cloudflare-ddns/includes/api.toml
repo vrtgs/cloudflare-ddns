@@ -1,0 +1,8 @@
+[account]
+email     = <EMAIL>
+api-token = <TOKEN>
+
+[zone]
+id     = <ID>
+record = <RECORD>
+# proxied = false

@@ -1,0 +1,5 @@
+[client]
+max-retries = 5
+retry-interval = 00:00:30
+# timeout = 00:02:30
+# max-idle-per-host = 16

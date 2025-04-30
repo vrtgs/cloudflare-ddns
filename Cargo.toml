@@ -1,0 +1,32 @@
+[profile.release]
+    opt-level = 'z'
+    strip = true
+    lto = "fat"
+    panic = "unwind"
+    codegen-units = 1
+    incremental = false
+
+[profile.linux-dispatcher]
+    inherits = "release"
+    opt-level = 'z'
+    strip = true
+    lto = "fat"
+    panic = "abort"
+    codegen-units = 1
+    incremental = false
+
+[profile.dev]
+    opt-level = 1
+    incremental = true
+    debug = true
+    panic = "unwind"
+    strip = false
+    lto = "off"
+
+[workspace]
+resolver = "2"
+members = [
+    "cloudflare-ddns",
+    "linux_dispatcher",
+    "ip_macro",
+]
