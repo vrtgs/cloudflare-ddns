@@ -1,9 +1,9 @@
-use std::fmt::{Debug, Display, Formatter, Write};
-use std::path::{Path, PathBuf};
-use std::{env, io};
-use std::sync::LazyLock;
 use anyhow::ensure;
 use artifact_dependency::{CrateType, Profile};
+use std::fmt::{Debug, Display, Formatter, Write};
+use std::path::{Path, PathBuf};
+use std::sync::LazyLock;
+use std::{env, io};
 use tokio::fs::File;
 use tokio::io::{AsyncWriteExt, BufWriter};
 use tokio::try_join;
@@ -28,9 +28,8 @@ macro_rules! get_var {
 }
 
 static OUT_DIR: LazyLock<&Path> = LazyLock::new(|| {
-    let boxed = PathBuf::from(get_var!("OUT_DIR").unwrap())
-        .into_boxed_path();
-    
+    let boxed = PathBuf::from(get_var!("OUT_DIR").unwrap()).into_boxed_path();
+
     Box::leak(boxed)
 });
 
@@ -107,12 +106,10 @@ async fn make_default_sources_rs() -> anyhow::Result<()> {
 }
 
 async fn generate_dispatcher() -> anyhow::Result<()> {
-
-
     if get_var!("CARGO_CFG_TARGET_OS")? == "linux" {
         println!("cargo::rerun-if-changed=/linux_dispatcher");
         println!("cargo::rerun-if-changed=src/network_listener/linux/dispatcher");
-    
+
         let target = get_var!("TARGET")?;
 
         tokio::task::spawn_blocking(move || {
@@ -126,18 +123,17 @@ async fn generate_dispatcher() -> anyhow::Result<()> {
                 .build()
                 .build()
                 .map_err(io::Error::other)?;
-            
-            assert_eq!(artifact.package.authors, ["IS", "LINUX", "DISPATCH", "ARTIFACT"]);
-            
-            std::fs::copy(
-                artifact.path,
-                OUT_DIR.join("./dispatcher-bin"),
-            ).unwrap();
-            
-            Ok::<_, io::Error>(())
-        }).await??;
 
-        
+            assert_eq!(
+                artifact.package.authors,
+                ["IS", "LINUX", "DISPATCH", "ARTIFACT"]
+            );
+
+            std::fs::copy(artifact.path, OUT_DIR.join("./dispatcher-bin")).unwrap();
+
+            Ok::<_, io::Error>(())
+        })
+        .await??;
     }
 
     Ok(())
@@ -149,13 +145,13 @@ async fn main() -> anyhow::Result<()> {
         std::fs::metadata("./includes")?.is_dir(),
         "no includes directory"
     );
-    
+
     println!("cargo::rerun-if-changed=default");
     try_join!(
         make_default_sources_toml(),
         make_default_sources_rs(),
         generate_dispatcher()
     )?;
-    
+
     Ok(())
 }

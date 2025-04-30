@@ -2,6 +2,7 @@
 
 extern crate core;
 
+use crate::addr_helper::IpType;
 use crate::config::ip_source::GetIpError;
 use crate::config::Config;
 use crate::json::EscapeExt;
@@ -11,6 +12,7 @@ use crate::retrying_client::RetryingClient;
 use crate::time::new_skip_interval;
 use crate::updaters::{UpdaterEvent, UpdaterExitStatus};
 use anyhow::{bail, Context, Result};
+use futures::future::Either;
 use futures::{stream, StreamExt, TryStreamExt};
 use serde::Deserialize;
 use std::borrow::Cow;
@@ -19,15 +21,13 @@ use std::net::IpAddr;
 use std::num::NonZeroU8;
 use std::panic::AssertUnwindSafe;
 use std::process::ExitCode;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::thread;
 use std::thread::Builder;
 use std::time::Duration;
-use futures::future::Either;
 use tokio::sync::Semaphore;
 use tokio::{join, try_join};
-use crate::addr_helper::IpType;
 
 mod addr_helper;
 mod config;
@@ -62,10 +62,7 @@ impl DDNSContext {
         }
     }
 
-    async fn get_ips(
-        &self,
-        cfg: &Config,
-    ) -> Result<Vec<IpAddr>> {
+    async fn get_ips(&self, cfg: &Config) -> Result<Vec<IpAddr>> {
         let last_err = Cell::new(None);
 
         let iter = cfg.ip_sources().map(|x| x.resolve_ip(&self.client, cfg));
@@ -84,9 +81,9 @@ impl DDNSContext {
             });
 
         let ip_ty = cfg.zone().ip_type();
-        
+
         let mut stream = stream.filter_map(|ip| std::future::ready(ip_ty.filter(ip)));
-        
+
         let mut ip4 = None;
         let mut ip6 = None;
 
@@ -96,22 +93,26 @@ impl DDNSContext {
                 IpAddr::V6(addr) if ip6.is_none() => ip6 = Some(addr),
                 _ => {}
             }
-            
+
             let exit_cond = match ip_ty {
                 IpType::Any => ip4.is_some() || ip6.is_some(),
                 IpType::Both => ip4.is_some() && ip6.is_some(),
                 IpType::V6 => ip6.is_some(),
                 IpType::V4 => ip4.is_some(),
             };
-            
+
             if exit_cond {
-                break
+                break;
             }
         }
-        
-        Ok(ip4.into_iter().map(IpAddr::V4).chain(ip6.into_iter().map(IpAddr::V6)).collect())
+
+        Ok(ip4
+            .into_iter()
+            .map(IpAddr::V4)
+            .chain(ip6.into_iter().map(IpAddr::V6))
+            .collect())
     }
-    
+
     async fn get_records(&self, cfg: &Config) -> Result<Vec<Record>> {
         #[derive(Debug, Deserialize)]
         struct FullIpTypeRecord {
@@ -141,10 +142,7 @@ impl DDNSContext {
                 .map_err(Into::into)
         }
 
-        let get = async move |record_type| {
-            get(self, cfg, record_type).await.map(|res| res.result)
-        };
-
+        let get = async move |record_type| get(self, cfg, record_type).await.map(|res| res.result);
 
         let mut one;
         let mut many;
@@ -156,19 +154,19 @@ impl DDNSContext {
                     Either::Left(match (v4, v6) {
                         (Err(err1), Err(err2)) => bail!(err1.context(err2)),
                         (Ok(record1), Ok(record2)) => record1.extend(record2),
-                        (Ok(record), Err(_)) | (Err(_), Ok(record)) => record
+                        (Ok(record), Err(_)) | (Err(_), Ok(record)) => record,
                     })
                 }
                 IpType::Both => Either::Right(try_join!(get("A"), get("AAAA"))?),
-                IpType::V6 =>  Either::Left(get("A").await?),
-                IpType::V4 =>  Either::Left(get("AAAA").await?)
+                IpType::V6 => Either::Left(get("A").await?),
+                IpType::V4 => Either::Left(get("AAAA").await?),
             };
 
             let iter = match records {
                 Either::Left(rec) => {
                     one = std::iter::once(rec);
 
-                    (&mut one) as &mut dyn Iterator<Item=_>
+                    (&mut one) as &mut dyn Iterator<Item = _>
                 }
                 Either::Right((first, second)) => {
                     many = [first, second].into_iter();
@@ -176,28 +174,30 @@ impl DDNSContext {
                 }
             };
 
-            iter.map(|record| {
-                match record {
-                    OneOrMore::Zero => bail!("found zero corresponding records {}", cfg.zone().record()),
-                    OneOrMore::More => bail!("found too many corresponding records for {}", cfg.zone().record()),
-                    OneOrMore::One(record) => Ok(record),
+            iter.map(|record| match record {
+                OneOrMore::Zero => {
+                    bail!("found zero corresponding records {}", cfg.zone().record())
                 }
+                OneOrMore::More => bail!(
+                    "found too many corresponding records for {}",
+                    cfg.zone().record()
+                ),
+                OneOrMore::One(record) => Ok(record),
             })
         };
 
+        recs.map(|res| {
+            res.and_then(|FullIpTypeRecord { name, id, ip }| {
+                anyhow::ensure!(
+                    &*name == cfg.zone().record(),
+                    "Expected {} found {name}",
+                    cfg.zone().record()
+                );
 
-        recs
-            .map(|res| {
-                res.and_then(|FullIpTypeRecord { name, id, ip }| {
-                    anyhow::ensure!(
-                        &*name == cfg.zone().record(),
-                        "Expected {} found {name}",
-                        cfg.zone().record()
-                    );
-
-                    Ok(Record { id, ip })
-                })
-            }).collect::<Result<Vec<_>>>()
+                Ok(Record { id, ip })
+            })
+        })
+        .collect::<Result<Vec<_>>>()
     }
 
     async fn update_record(&self, id: &str, ip: IpAddr, cfg: &Config) -> Result<()> {
@@ -251,42 +251,44 @@ impl DDNSContext {
         let found_record_and_ip = AtomicBool::new(false);
         let ip_changed = AtomicBool::new(false);
 
-        stream::iter(records).map(Ok).try_for_each_concurrent(None, |record| async {
-            // move
-            let record = record;
-            
-            if current_ips.contains(&record.ip) {
-                return Ok(());
-            }
-            
-            ip_changed.store(true, Ordering::Relaxed);
-            
-            
-            let find = match record.ip {
-                IpAddr::V4(_) => (|ip| ip.is_ipv4()) as fn(IpAddr) -> _,
-                IpAddr::V6(_) => (|ip| ip.is_ipv6()) as fn(IpAddr) -> _,
-            };
-            
-            let ip = current_ips.iter().copied().find(|ip| find(*ip));
-            
-            found_record_and_ip.store(ip.is_some(), Ordering::Relaxed);
-            
-            if ip.is_none() && cfg.zone().ip_type() == IpType::Any { 
-                return Ok(())
-            }
-            
-            let ip = ip.context(GetIpError::NoIpSources)?;
-            
-            self.update_record(&record.id, ip, &cfg).await
-        }).await?;
+        stream::iter(records)
+            .map(Ok)
+            .try_for_each_concurrent(None, |record| async {
+                // move
+                let record = record;
+
+                if current_ips.contains(&record.ip) {
+                    return Ok(());
+                }
+
+                ip_changed.store(true, Ordering::Relaxed);
+
+                let find = match record.ip {
+                    IpAddr::V4(_) => (|ip| ip.is_ipv4()) as fn(IpAddr) -> _,
+                    IpAddr::V6(_) => (|ip| ip.is_ipv6()) as fn(IpAddr) -> _,
+                };
+
+                let ip = current_ips.iter().copied().find(|ip| find(*ip));
+
+                found_record_and_ip.store(ip.is_some(), Ordering::Relaxed);
+
+                if ip.is_none() && cfg.zone().ip_type() == IpType::Any {
+                    return Ok(());
+                }
+
+                let ip = ip.context(GetIpError::NoIpSources)?;
+
+                self.update_record(&record.id, ip, &cfg).await
+            })
+            .await?;
 
         let ip_changed = ip_changed.into_inner();
         let found_record_and_ip = found_record_and_ip.into_inner();
-        
+
         if cfg.zone().ip_type() == IpType::Any && ip_changed && !found_record_and_ip {
             bail!(GetIpError::NoIpSources)
         }
-        
+
         Ok(ip_changed)
     }
 }

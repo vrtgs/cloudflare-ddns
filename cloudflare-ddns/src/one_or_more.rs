@@ -11,9 +11,10 @@ impl<T> OneOrMore<T> {
     pub fn extend(self, other: Self) -> Self {
         match (self, other) {
             (OneOrMore::Zero, OneOrMore::Zero) => OneOrMore::Zero,
-            (OneOrMore::One(x), OneOrMore::Zero)
-            | (OneOrMore::Zero, OneOrMore::One(x)) => OneOrMore::One(x),
-            _ => OneOrMore::More
+            (OneOrMore::One(x), OneOrMore::Zero) | (OneOrMore::Zero, OneOrMore::One(x)) => {
+                OneOrMore::One(x)
+            }
+            _ => OneOrMore::More,
         }
     }
 }
