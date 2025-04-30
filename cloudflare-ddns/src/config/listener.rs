@@ -1,13 +1,13 @@
 use crate::config::ip_source::Sources;
-use crate::config::{deserialize_from_file, CfgInner, Config};
+use crate::config::{CfgInner, Config, deserialize_from_file};
 use crate::updaters::{Updater, UpdatersManager};
-use crate::{non_zero, DDNSContext, UserMessages};
+use crate::{DDNSContext, UserMessages, non_zero};
 use anyhow::Result;
-use anyhow::{anyhow, Context};
+use anyhow::{Context, anyhow};
 use arc_swap::ArcSwap;
 use notify::{RecommendedWatcher, RecursiveMode};
 use notify_debouncer_full::{
-    new_debouncer_opt, DebounceEventHandler, DebounceEventResult, FileIdMap,
+    DebounceEventHandler, DebounceEventResult, FileIdMap, new_debouncer_opt,
 };
 use std::io;
 use std::path::Path;

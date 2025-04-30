@@ -1,5 +1,5 @@
-use crate::config::time::Time;
 use crate::config::Deserializable;
+use crate::config::time::Time;
 use anyhow::Result;
 use serde::Deserialize;
 use std::num::NonZeroU8;

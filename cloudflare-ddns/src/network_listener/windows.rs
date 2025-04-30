@@ -10,13 +10,14 @@ use std::pin::Pin;
 use tokio::runtime::Handle as TokioHandle;
 use tokio::sync::Notify;
 use tokio::task::JoinHandle;
-use windows::core::Result as WinResult;
-use windows::core::{implement, Interface, GUID};
 use windows::Win32::Networking::NetworkListManager::{
-    INetworkEvents, INetworkEvents_Impl, INetworkListManager, NetworkListManager, NLM_CONNECTIVITY,
+    INetworkEvents, INetworkEvents_Impl, INetworkListManager, NLM_CONNECTIVITY,
     NLM_CONNECTIVITY_IPV4_INTERNET, NLM_CONNECTIVITY_IPV6_INTERNET, NLM_NETWORK_PROPERTY_CHANGE,
+    NetworkListManager,
 };
 use windows::Win32::System::Com;
+use windows::core::Result as WinResult;
+use windows::core::{GUID, Interface, implement};
 
 #[derive(thiserror::Error, Debug)]
 pub enum UpdaterError {

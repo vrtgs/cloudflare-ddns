@@ -1,6 +1,6 @@
 use crate::abort_unreachable;
 use crate::config::Config;
-use reqwest::header::{HeaderName, HeaderValue, CONTENT_TYPE};
+use reqwest::header::{CONTENT_TYPE, HeaderName, HeaderValue};
 use reqwest::{Body, Client, ClientBuilder, IntoUrl, Method, Request, Response};
 use std::time::Duration;
 

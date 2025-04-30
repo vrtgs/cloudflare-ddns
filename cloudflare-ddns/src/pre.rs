@@ -43,9 +43,10 @@ pub fn ensure_dbus_session() {
         .flat_map(|s| s.split_once('='))
         .collect::<Vec<_>>();
 
-    assert!(envs
-        .iter()
-        .any(|&(k, _)| k.eq_ignore_ascii_case("DBUS_SESSION_BUS_ADDRESS")));
+    assert!(
+        envs.iter()
+            .any(|&(k, _)| k.eq_ignore_ascii_case("DBUS_SESSION_BUS_ADDRESS"))
+    );
 
     // first arg is program path
     let mut args = std::env::args_os();

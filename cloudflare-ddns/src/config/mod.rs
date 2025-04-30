@@ -2,7 +2,7 @@ use crate::config::api_fields::{Account, ApiFields, Auth, Zone};
 use crate::config::http::HttpConfig;
 use crate::config::ip_source::{IpSource, Sources};
 use crate::config::misc::MiscConfig;
-use crate::retrying_client::{RequestBuilder, AUTHORIZATION_EMAIL, AUTHORIZATION_KEY};
+use crate::retrying_client::{AUTHORIZATION_EMAIL, AUTHORIZATION_KEY, RequestBuilder};
 use reqwest::header::AUTHORIZATION;
 use std::num::NonZeroU8;
 use std::path::Path;

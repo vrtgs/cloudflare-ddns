@@ -8,9 +8,7 @@ use tokio::task::JoinHandle;
 #[allow(dead_code)]
 pub static GLOBAL_TOKIO_RUNTIME: LazyLock<TokioHandle> = LazyLock::new(|| {
     macro_rules! rt_abort {
-        () => {{
-            |e| crate::abort!("failed to initialize the global tokio runtime due to {e}")
-        }};
+        () => {{ |e| crate::abort!("failed to initialize the global tokio runtime due to {e}") }};
     }
 
     let runtime = tokio::runtime::Builder::new_current_thread()

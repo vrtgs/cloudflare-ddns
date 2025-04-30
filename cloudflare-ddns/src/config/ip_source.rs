@@ -23,8 +23,8 @@ use std::pin::pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use thiserror::Error;
-use toml::map::Map;
 use toml::Value;
+use toml::map::Map;
 use url::Url;
 
 #[derive(Debug, Error)]

@@ -1,12 +1,12 @@
 use crate::abort_unreachable;
 use ahash::{HashMap, HashMapExt};
-use futures::stream::FuturesUnordered;
 use futures::StreamExt;
+use futures::stream::FuturesUnordered;
 use std::collections::hash_map::{Entry, VacantEntry};
 use std::fmt::{Display, Formatter};
 use std::sync::{Arc, Weak};
-use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tokio::sync::Notify;
+use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tokio::task::JoinHandle;
 
 pub enum UpdaterEvent {

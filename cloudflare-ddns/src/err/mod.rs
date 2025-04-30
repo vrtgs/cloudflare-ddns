@@ -55,10 +55,10 @@ mod sys {
     use std::ffi::OsStr;
     use std::num::NonZeroU16;
     use std::os::windows::ffi::OsStrExt;
-    use windows::core::{w as wide, PCWSTR};
     use windows::Win32::UI::WindowsAndMessaging::{
-        MessageBoxW, MB_ICONERROR, MB_ICONWARNING, MB_OK, MESSAGEBOX_STYLE,
+        MB_ICONERROR, MB_ICONWARNING, MB_OK, MESSAGEBOX_STYLE, MessageBoxW,
     };
+    use windows::core::{PCWSTR, w as wide};
 
     fn encode_wide(str: &OsStr) -> Vec<u16> {
         str.encode_wide()
@@ -100,8 +100,8 @@ mod sys {
     use core_foundation::string::CFString;
     use core_foundation_sys::base::CFOptionFlags;
     use core_foundation_sys::user_notification::{
-        kCFUserNotificationCautionAlertLevel, kCFUserNotificationStopAlertLevel,
-        CFUserNotificationDisplayAlert,
+        CFUserNotificationDisplayAlert, kCFUserNotificationCautionAlertLevel,
+        kCFUserNotificationStopAlertLevel,
     };
 
     fn present_alert(title: &str, message: &str, flags: CFOptionFlags) {

@@ -4,8 +4,8 @@ mod r#impl {
     use std::convert::Infallible;
     use std::sync::LazyLock;
     use std::{io, thread};
-    use tokio::sync::mpsc::Receiver;
     use tokio::sync::Mutex;
+    use tokio::sync::mpsc::Receiver;
 
     enum Status {
         Success,
