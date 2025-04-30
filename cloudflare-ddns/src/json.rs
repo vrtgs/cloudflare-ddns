@@ -2,7 +2,7 @@ use std::fmt::{Display, Formatter, Write};
 
 pub struct EscapeJson<'a>(&'a str);
 
-impl<'a> Display for EscapeJson<'a> {
+impl Display for EscapeJson<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut utf16_buf = [0u16; 2];
         for c in self.0.chars() {

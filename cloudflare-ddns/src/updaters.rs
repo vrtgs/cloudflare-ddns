@@ -151,13 +151,13 @@ pub struct JhEntry<'a> {
     name: &'static str,
 }
 
-impl<'a> JhEntry<'a> {
+impl JhEntry<'_> {
     pub fn insert(mut self, jh: JoinHandle<()>) {
         self.entry.take().unwrap().insert(jh);
     }
 }
 
-impl<'a> Drop for JhEntry<'a> {
+impl Drop for JhEntry<'_> {
     fn drop(&mut self) {
         if self.entry.is_some() {
             // we do this and trigger the watch to panic on no join handle provided

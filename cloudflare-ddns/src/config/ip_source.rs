@@ -153,7 +153,7 @@ fn get_json_key(json: &[u8], key: &str) -> serde_json::Result<serde_json::Value>
         key: &'a str,
     }
 
-    impl<'de, 'a> Visitor<'de> for JsonVisitor<'a> {
+    impl<'de> Visitor<'de> for JsonVisitor<'_> {
         type Value = serde_json::Value;
 
         fn expecting(&self, formatter: &mut Formatter) -> std::fmt::Result {
