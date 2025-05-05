@@ -50,7 +50,7 @@ features = [
 dbus = { version = "0.9.7", features = ["futures"] }
 dbus-tokio = "0.7.6"
 simple_logger = { version = "5.0.0", features = ["colors", "threads", "timestamps", "stderr"] }
-systemd-journal-logger = "2.1.1"
+systemd-journal-logger = "2.2.2"
 log = "0.4.21"
 tempfile = "3.13.0"
 
