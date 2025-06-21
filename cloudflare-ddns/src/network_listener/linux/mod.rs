@@ -127,7 +127,7 @@ async fn place_dispatcher() -> Result<()> {
 
                     Ok(eq && dispatcher_bytes.as_slice().is_empty())
                 };
-                
+
                 let invalid =
                     |loc: &Path| Ok::<_, io::Error>(!loc.try_exists()? || eq_contents(loc)?);
 
