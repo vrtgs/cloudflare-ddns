@@ -1,0 +1,9 @@
+[package]
+name = "linux_dispatcher"
+version = "0.1.0"
+edition = "2024"
+authors = ["IS", "LINUX", "DISPATCH", "ARTIFACT"]
+
+
+[dependencies]
+cfg-if = "1.0.0"

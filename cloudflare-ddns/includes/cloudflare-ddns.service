@@ -1,0 +1,23 @@
+[Unit]
+# A short human readable title of the unit
+Description=ddns client for cloudflare.
+# A list of units whose activations will occur before this unit starts.
+After=network.target
+
+[Service]
+# Configures the process start-up type for this service unit, one of:
+# simple - The process defined in ExecStart= will stay in the foreground while the unit is activated.
+# forking - The process defined in ExecStart= will fork a background process and exit right away.
+# oneshot - The process will exit right away, use with RemainAfterExit= to ensure the serice is marked as active.
+# Consult the documentantion for types (https://www.freedesktop.org/software/systemd/man/systemd.service.html#Type=) other options.
+Type=simple
+# Command with arguments to invoke when the unit is activated.
+ExecStart={program_path}
+# Configures under what conditions the unit will be restarted.
+Restart=always
+# User under which the service will run.
+User=root
+
+[Install]
+# A list of units who when activated will try and activate this unit
+WantedBy=multi-user.target
