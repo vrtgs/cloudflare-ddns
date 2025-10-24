@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org).
 
+## [0.3.2] - 2025-10-24
+- Fix issue where record one type of ip logs is missing, and that keeps causing failure for BOTH ip record types.
+
 ## [0.3.1] - 2025-04-30
 - simultaneous Ipv6 and Ipv4 support.
 
