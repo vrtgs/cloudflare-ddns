@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org).
 
+
+## [0.3.3] - 2025-10-24
+- Fix bug where the program would think its all out of IP's even when it wasn't.
+
 ## [0.3.2] - 2025-10-24
 - Fix issue where record one type of ip logs is missing, and that keeps causing failure for BOTH ip record types.
 
