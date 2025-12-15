@@ -4,6 +4,7 @@ extern crate core;
 
 use crate::addr_helper::IpType;
 use crate::config::Config;
+use crate::config::ip_source::GetIpError;
 use crate::json::EscapeExt;
 use crate::network_listener::has_internet;
 use crate::one_or_more::OneOrMore;
@@ -11,8 +12,10 @@ use crate::retrying_client::RetryingClient;
 use crate::time::new_skip_interval;
 use crate::updaters::{UpdaterEvent, UpdaterExitStatus};
 use anyhow::{Context, Result, bail, ensure};
+use bytes::Bytes;
 use futures::StreamExt;
 use serde::Deserialize;
+use serde::de::DeserializeOwned;
 use std::borrow::Cow;
 use std::cell::Cell;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
@@ -23,11 +26,8 @@ use std::sync::Arc;
 use std::thread;
 use std::thread::Builder;
 use std::time::Duration;
-use bytes::Bytes;
-use serde::de::DeserializeOwned;
 use tokio::sync::Semaphore;
 use tokio::{join, try_join};
-use crate::config::ip_source::GetIpError;
 
 mod addr_helper;
 mod config;
@@ -48,7 +48,6 @@ struct DDNSContext {
     user_messages: UserMessages,
 }
 
-
 #[derive(Debug)]
 struct Record<T> {
     id: Box<str>,
@@ -57,7 +56,6 @@ struct Record<T> {
 
 type RecordV4 = Record<Ipv4Addr>;
 type RecordV6 = Record<Ipv6Addr>;
-
 
 impl DDNSContext {
     fn new(cfg: Config) -> Self {
@@ -107,7 +105,7 @@ impl DDNSContext {
             };
 
             if exit_cond {
-                break
+                break;
             }
         }
 
@@ -127,7 +125,6 @@ impl DDNSContext {
         pub struct GetResponse<T> {
             result: OneOrMore<FullIpTypeRecord<T>>,
         }
-
 
         async fn get_bytes(this: &DDNSContext, cfg: &Config, record_type: &str) -> Result<Bytes> {
             let url = format!(
@@ -156,21 +153,23 @@ impl DDNSContext {
             const RECORD: &str = "AAAA";
         }
 
-        async fn get_record_typed<T: IpVersion>(this: &DDNSContext, cfg: &Config)
-            -> Result<Record<T>>
-        {
+        async fn get_record_typed<T: IpVersion>(
+            this: &DDNSContext,
+            cfg: &Config,
+        ) -> Result<Record<T>> {
             let response = get_bytes(this, cfg, T::RECORD).await?;
-            let FullIpTypeRecord { name, id, ip } = match serde_json::from_slice::<GetResponse<T>>(&response)?.result {
-                OneOrMore::Zero => {
-                    bail!("found zero corresponding records {}", cfg.zone().record())
-                }
-                OneOrMore::More => bail!(
-                    "found too many corresponding `{TYPE}` records for {}",
-                    cfg.zone().record(),
-                    TYPE = T::RECORD,
-                ),
-                OneOrMore::One(record) => record,
-            };
+            let FullIpTypeRecord { name, id, ip } =
+                match serde_json::from_slice::<GetResponse<T>>(&response)?.result {
+                    OneOrMore::Zero => {
+                        bail!("found zero corresponding records {}", cfg.zone().record())
+                    }
+                    OneOrMore::More => bail!(
+                        "found too many corresponding `{TYPE}` records for {}",
+                        cfg.zone().record(),
+                        TYPE = T::RECORD,
+                    ),
+                    OneOrMore::One(record) => record,
+                };
 
             anyhow::ensure!(
                 &*name == cfg.zone().record(),
@@ -189,7 +188,7 @@ impl DDNSContext {
                 );
                 match (v4, v6) {
                     (Err(v4_err), Err(v6_err)) => bail!(v4_err.context(v6_err)),
-                    (v4, v6) => (v4.ok(), v6.ok())
+                    (v4, v6) => (v4.ok(), v6.ok()),
                 }
             }
             IpType::Both => {
@@ -198,9 +197,9 @@ impl DDNSContext {
                     get_record_typed::<Ipv6Addr>(self, cfg)
                 )?;
                 (Some(v4), Some(v6))
-            },
+            }
             IpType::V6 => (None, Some(get_record_typed::<Ipv6Addr>(self, cfg).await?)),
-            IpType::V4 => (Some(get_record_typed::<Ipv4Addr>(self, cfg).await?), None)
+            IpType::V4 => (Some(get_record_typed::<Ipv4Addr>(self, cfg).await?), None),
         })
     }
 
@@ -250,15 +249,16 @@ impl DDNSContext {
     }
 
     pub async fn run_ddns(&self, cfg: Config) -> Result<bool> {
-        let ((v4_record, v6_record), (v4_ip, v6_ip))
-            = try_join!(self.get_records(&cfg), self.get_ips(&cfg))?;
-
+        let ((v4_record, v6_record), (v4_ip, v6_ip)) =
+            try_join!(self.get_records(&cfg), self.get_ips(&cfg))?;
 
         let has_ip_source = match (&v4_record, &v6_record) {
             (Some(_), Some(_)) => v4_ip.is_some() || v6_ip.is_some(),
             (Some(_), None) => v4_ip.is_some(),
             (None, Some(_)) => v6_ip.is_some(),
-            (None, None) => unreachable!("this case should have errored before reaching this point")
+            (None, None) => {
+                unreachable!("this case should have errored before reaching this point")
+            }
         };
 
         ensure!(has_ip_source, GetIpError::NoIpSources);
@@ -267,11 +267,13 @@ impl DDNSContext {
             this: &DDNSContext,
             cfg: &Config,
             record: Option<Record<T>>,
-            ip: Option<T>
+            ip: Option<T>,
         ) -> Result<bool> {
-            if let Some(record) = record && let Some(ip) = ip {
+            if let Some(record) = record
+                && let Some(ip) = ip
+            {
                 if record.ip == ip {
-                    return Ok(false)
+                    return Ok(false);
                 }
 
                 this.update_record(&record.id, ip.into(), cfg).await?

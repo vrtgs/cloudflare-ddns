@@ -193,10 +193,9 @@ mod sys {
         }
     }
 
-
     static ERROR_BACK_END: LazyLock<ErrorBackEnd> = LazyLock::new(|| {
         static LOGGERS: OnceLock<Loggers> = OnceLock::new();
-        
+
         log::set_logger(LOGGERS.get_or_init(Loggers::default))
             .expect("unable to set any form of logging");
         ErrorBackEnd::Logger
