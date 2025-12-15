@@ -35,9 +35,10 @@ jobs:
     steps:
       - name: Install dependencies on Ubuntu
         if: runner.os == 'Linux'
-        run: sudo apt install libdbus-1-dev pkg-config upx
+        run: sudo apt install libdbus-1-dev pkg-config
 
 #      needs post build script to pack the binary
+#      on linux: apt install upx pu in above
 #      - name: Install UPX on macOS
 #        if: runner.os == 'macOS'
 #        run: brew install upx

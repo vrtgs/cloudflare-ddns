@@ -161,7 +161,7 @@ fn make_config() {
 
         include!("api", "http", "misc");
         std::fs::write(
-            concat!("./config/sources.toml"),
+            "./config/sources.toml",
             include_str!(concat!(env!("OUT_DIR"), "/sources.toml")),
         )?;
 

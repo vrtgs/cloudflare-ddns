@@ -183,23 +183,21 @@ struct Process {
 
 impl Process {
     async fn run(&self, mut bytes: Bytes, _cfg: &Config) -> Result<IpAddr, GetIpError> {
-        use ProcessStep as S;
         for step in &*self.steps {
+            use ProcessStep as S;
             match step {
                 S::Plaintext => {
                     simdutf8::basic::from_utf8(&bytes)?;
                 }
                 S::Strip { prefix, suffix } => {
-                    if let Some(prefix) = prefix {
-                        if bytes.starts_with(prefix) {
-                            bytes = bytes.split_off(prefix.len());
-                        }
+                    if let Some(prefix) = prefix
+                        && bytes.starts_with(prefix) {
+                        bytes = bytes.split_off(prefix.len());
                     }
 
-                    if let Some(suffix) = suffix {
-                        if bytes.ends_with(suffix) {
-                            bytes.truncate(bytes.len() - suffix.len())
-                        }
+                    if let Some(suffix) = suffix
+                        && bytes.ends_with(suffix) {
+                        bytes.truncate(bytes.len() - suffix.len())
                     }
                 }
                 S::Json { key } => {
