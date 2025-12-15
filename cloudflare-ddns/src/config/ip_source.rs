@@ -191,12 +191,14 @@ impl Process {
                 }
                 S::Strip { prefix, suffix } => {
                     if let Some(prefix) = prefix
-                        && bytes.starts_with(prefix) {
+                        && bytes.starts_with(prefix)
+                    {
                         bytes = bytes.split_off(prefix.len());
                     }
 
                     if let Some(suffix) = suffix
-                        && bytes.ends_with(suffix) {
+                        && bytes.ends_with(suffix)
+                    {
                         bytes.truncate(bytes.len() - suffix.len())
                     }
                 }

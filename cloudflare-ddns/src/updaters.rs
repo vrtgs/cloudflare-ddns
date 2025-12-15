@@ -129,7 +129,8 @@ impl UpdatersManager {
     pub async fn shutdown(self) {
         async fn forward_panic(join_handle: JoinHandle<()>) {
             if let Err(e) = join_handle.await
-                && let Ok(panic) = e.try_into_panic() {
+                && let Ok(panic) = e.try_into_panic()
+            {
                 std::panic::resume_unwind(panic)
             }
         }
