@@ -25,13 +25,13 @@ mod sys {
 
 #[cfg(unix)]
 mod sys {
-    use tokio::signal::unix as signal;
+    use tokio::signal::unix as nix;
 
     pub(super) async fn recv_exit() {
-        let mut terminate = signal::signal(signal::SignalKind::terminate()).unwrap();
-        let mut quit = signal::signal(signal::SignalKind::quit()).unwrap();
-        let mut hangup = signal::signal(signal::SignalKind::hangup()).unwrap();
-        let mut interrupt = signal::signal(signal::SignalKind::interrupt()).unwrap();
+        let mut terminate = nix::signal(nix::SignalKind::terminate()).unwrap();
+        let mut quit = nix::signal(nix::SignalKind::quit()).unwrap();
+        let mut hangup = nix::signal(nix::SignalKind::hangup()).unwrap();
+        let mut interrupt = nix::signal(nix::SignalKind::interrupt()).unwrap();
         wait_for_any!(
             terminate.recv(),
             quit.recv(),
@@ -43,7 +43,7 @@ mod sys {
 
 pub fn subscribe(updaters_manager: &mut UpdatersManager) -> Result<(), Infallible> {
     let (updater, jh_entry) = updaters_manager.add_updater("shutdown-listener");
-    jh_entry.insert(tokio::spawn(async {
+    jh_entry.insert(tokio::spawn(async move {
         tokio::select! {
             _ = sys::recv_exit() => updater.trigger_exit(0),
             _ = updater.wait_shutdown() => {}

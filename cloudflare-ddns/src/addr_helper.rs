@@ -119,14 +119,3 @@ impl FromStr for IpType {
         }
     }
 }
-
-impl IpType {
-    pub fn filter(self, ip: IpAddr) -> Option<IpAddr> {
-        match self {
-            IpType::Any | IpType::Both => Some(ip),
-            IpType::V6 if ip.is_ipv6() => Some(ip),
-            IpType::V4 if ip.is_ipv4() => Some(ip),
-            _ => None,
-        }
-    }
-}

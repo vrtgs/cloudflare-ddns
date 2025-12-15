@@ -160,7 +160,8 @@ impl JhEntry<'_> {
 impl Drop for JhEntry<'_> {
     fn drop(&mut self) {
         if self.entry.is_some() {
-            // we do this and trigger the watch to panic on no join handle provided
+            // we do this and trigger the `UpdatersManager::watch`
+            // to panic since no join handle provided
             let _ = self.send_fail.send(UpdaterExit {
                 name: self.name,
                 status: UpdaterExitStatus::Success,

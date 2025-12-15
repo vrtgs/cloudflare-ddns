@@ -147,8 +147,7 @@ mod sys {
     // use gtk4::{Application, ApplicationWindow, ButtonsType, MessageDialog, MessageType};
     use log::{Log, Metadata, Record};
     use simple_logger::SimpleLogger;
-    use std::ops::Deref;
-    use std::sync::OnceLock;
+    use std::sync::{LazyLock, OnceLock};
     use systemd_journal_logger::JournalLog;
 
     enum OneOrTwo<T> {
@@ -165,7 +164,7 @@ mod sys {
                 OneOrTwo::Two(two) => two,
             }
             .iter()
-            .map(Deref::deref)
+            .map(|logger| &**logger)
         }
     }
 
@@ -173,11 +172,10 @@ mod sys {
         fn default() -> Self {
             let simple = Box::new(SimpleLogger::new()) as Box<dyn Log>;
             let system_d = JournalLog::new().map(Box::new);
-            let stuff = match system_d {
+            Self(match system_d {
                 Ok(system_d) => OneOrTwo::Two([simple, system_d]),
                 Err(_) => OneOrTwo::One(simple),
-            };
-            Self(stuff)
+            })
         }
     }
 
@@ -195,97 +193,22 @@ mod sys {
         }
     }
 
-    static LOGGERS: OnceLock<Loggers> = OnceLock::new();
 
-    static GTK_AVAILABLE: OnceLock<ErrorBackEnd> = OnceLock::new();
+    static ERROR_BACK_END: LazyLock<ErrorBackEnd> = LazyLock::new(|| {
+        static LOGGERS: OnceLock<Loggers> = OnceLock::new();
+        
+        log::set_logger(LOGGERS.get_or_init(Loggers::default))
+            .expect("unable to set any form of logging");
+        ErrorBackEnd::Logger
+    });
 
-    // type GtkMessage = (Box<dyn FnOnce() + Send>, OneShotSender<()>);
     #[derive(Clone)]
     enum ErrorBackEnd {
-        // Gtk(std::sync::mpsc::Sender<GtkMessage>),
         Logger,
     }
 
-    fn back_end() -> ErrorBackEnd {
-        GTK_AVAILABLE
-            .get_or_init(|| {
-                // let (send, rcv) = std::sync::mpsc::sync_channel(1);
-                // let _ = thread::Builder::new().spawn(move || {
-                //     if gtk4::init().is_err() {
-                //         let _ = send.send(Err(()));
-                //         return;
-                //     }
-                //     let (task_send, rcv) = std::sync::mpsc::channel::<GtkMessage>();
-                //     let _ = send.send(Ok(task_send));
-                //
-                //     for (msg, cb) in rcv {
-                //         msg();
-                //         let _ = cb.send(());
-                //     }
-                // });
-                //
-                // match rcv.recv() {
-                //     Ok(Ok(sender)) => ErrorBackEnd::Gtk(sender),
-                //     _ => {
-                //         log::set_logger(LOGGERS.get_or_init(Loggers::default))
-                //             .expect("unable to set any form of logging");
-                //         ErrorBackEnd::Logger
-                //     }
-                // }
-
-                log::set_logger(LOGGERS.get_or_init(Loggers::default))
-                    .expect("unable to set any form of logging");
-                ErrorBackEnd::Logger
-            })
-            .clone()
-    }
-
-    // fn gtk_present(title: String, msg: String, message_type: MessageType) {
-    //     let app = Application::builder()
-    //         .application_id("xyz.vrtgs.cloudflare-ddns.errors")
-    //         .build();
-    //
-    //     app.connect_activate(move |app| {
-    //         let window = ApplicationWindow::builder()
-    //             .application(app)
-    //             .title(&title)
-    //             .default_width(0)
-    //             .default_height(0)
-    //             .build();
-    //
-    //         let dialog = MessageDialog::builder()
-    //             .transient_for(&window)
-    //             .modal(true)
-    //             .buttons(ButtonsType::Close)
-    //             .message_type(message_type)
-    //             .text(&title)
-    //             .secondary_text(&msg)
-    //             .build();
-    //
-    //         let app = app.clone();
-    //         dialog.connect_response(move |dialog, _| {
-    //             dialog.close();
-    //             window.close();
-    //             app.quit();
-    //         });
-    //
-    //         dialog.show();
-    //     });
-    //
-    //     app.run();
-    // }
-
     fn present_alert(title: &str, msg: &str, message_type: log::Level) {
-        match back_end() {
-            // ErrorBackEnd::Gtk(chan) => {
-            //     let (title, msg) = (title.to_owned(), msg.to_owned());
-            //     let (send, wait) = std::sync::mpsc::sync_channel(1);
-            //     let _ = chan.send((
-            //         Box::new(move || gtk_present(title, msg, message_type)),
-            //         send,
-            //     ));
-            //     let _ = wait.recv();
-            // }
+        match &*ERROR_BACK_END {
             ErrorBackEnd::Logger => match message_type {
                 log::Level::Warn => log::warn!("[{title}]: {msg}"),
                 log::Level::Error => log::error!("[{title}]: {msg}"),

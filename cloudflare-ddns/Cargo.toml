@@ -10,26 +10,29 @@ trace = ["tokio/tracing", "dep:console-subscriber"]
 
 
 [dependencies]
-tokio                 = { version = "1.44.2", features = ["full"] }
 futures               = { version = "0.3.31"}
-serde                 = { version = "1.0.219", features = ["derive", "rc"] }
-anyhow                = { version = "1.0.95", features = ["backtrace"] }
+serde                 = { version = "1.0.228", features = ["derive", "rc"] }
+anyhow                = { version = "1.0.100", features = ["backtrace"] }
 ip_macro              = { version = "*", path = "../ip_macro" }
-console-subscriber    = { version = "0.4.1", optional = true }
+console-subscriber    = { version = "0.5.0", optional = true }
 simdutf8              = "0.1.5"
-url                   = "2.5.4"
-toml                  = "0.8.19"
-serde_json            = "1.0.128"
-bytes                 = "1.9.0"
-thiserror             = "2.0.11"
+url                   = "2.5.7"
+toml                  = "0.9.8"
+serde_json            = "1.0.145"
+bytes                 = "1.11.0"
+thiserror             = "2.0.17"
 ahash                 = "0.8.11"
 arc-swap              = "1.7.1"
 notify                = "8.0.0"
-notify-debouncer-full = "0.5.0"
-idna                  = "1.0.2"
+notify-debouncer-full = "0.6.0"
+idna                  = "1.1.0"
+
+[dependencies.tokio]
+version = "1.48.0"
+features = ["rt-multi-thread", "sync", "fs", "net", "signal", "macros"]
 
 [dependencies.reqwest]
-version = "0.12.15"
+version = "0.12.26"
 default-features = false
 features = [
     "charset",
@@ -86,6 +89,6 @@ core-foundation-sys  = "0.8.6"
 system-configuration = "0.6.1"
 
 [build-dependencies]
-tokio = { version = "1.44.2", features = ["rt", "macros", "fs", "io-util", "process"] }
-anyhow = "1.0.95"
+tokio = { version = "1.48.0", features = ["rt", "macros", "fs", "io-util", "process"] }
+anyhow = "1.0.100"
 artifact-dependency = "0.1.7"
