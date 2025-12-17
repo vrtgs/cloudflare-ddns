@@ -5,7 +5,6 @@ use crate::retrying_client::RetryingClient;
 use crate::{abort_unreachable, non_zero};
 use anyhow::Result;
 use bytes::Bytes;
-use futures::task::noop_waker_ref;
 use futures::{StreamExt, TryStreamExt};
 use serde::de::{Error, MapAccess, SeqAccess, Visitor};
 use serde::ser::SerializeMap;
@@ -21,7 +20,7 @@ use std::num::NonZero;
 use std::ops::Deref;
 use std::pin::pin;
 use std::sync::Arc;
-use std::task::{Context, Poll};
+use std::task::{Context, Poll, Waker};
 use thiserror::Error;
 use toml::Value;
 use toml::map::Map;
@@ -212,7 +211,7 @@ impl Process {
             }
         }
 
-        Ok(IpAddr::parse_ascii_bytes(&bytes)?)
+        Ok(IpAddr::parse_ascii_bytes(bytes.trim_ascii())?)
     }
 }
 
@@ -235,7 +234,7 @@ async fn into_process(mut steps: Vec<ProcessStep>) -> Process {
             }
         })
         .buffered(num_cpus().get())
-        .filter_map(|x| async move { x })
+        .filter_map(std::future::ready)
         .collect::<Vec<_>>()
         .await;
 
@@ -274,13 +273,12 @@ impl Sources {
             .await
             .map(|sources| Sources {
                 sources,
-                // # Safety:
-                // 16 is not = to 0, lol
                 concurrent_resolve: concurrent_resolve.unwrap_or_else(|| {
-                    // 4 requests a core is a reasonable default
+                    // 4 requests per core is a reasonable default
                     num_cpus()
                         .saturating_mul(non_zero!(4))
                         .try_into()
+                        // saturating convertsion
                         .unwrap_or(NonZero::<u8>::MAX)
                 }),
             })
@@ -335,7 +333,8 @@ impl Deserializable for Sources {
 
         get_field!(
             concurrent_resolve: ["concurrent-resolve", "concurrent_resolve"] => |key, val|
-                NonZero::<u8>::new(val.try_into::<u8>()?).ok_or_else(|| anyhow::anyhow!("{key} can't be zero"))?
+                NonZero::<u8>::new(val.try_into::<u8>()?)
+                    .ok_or_else(|| anyhow::anyhow!("{key} can't be zero"))?
         );
 
         Self::from_try_iter(
@@ -363,7 +362,7 @@ impl Default for Sources {
             include!(concat!(env!("OUT_DIR"), "/sources.array")),
             None,
         ))
-        .poll(&mut Context::from_waker(noop_waker_ref())) else {
+        .poll(&mut Context::from_waker(Waker::noop())) else {
             abort_unreachable!("bad build artifact")
         };
 

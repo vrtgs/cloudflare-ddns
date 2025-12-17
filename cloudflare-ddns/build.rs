@@ -93,7 +93,7 @@ async fn make_default_sources_rs() -> anyhow::Result<()> {
             source,
             vec![format!(
                 r#"ProcessStep::Json {{ key: "{}".into() }}"#,
-                key.escape_debug()
+                key.escape_default()
             )],
         )
     }));
