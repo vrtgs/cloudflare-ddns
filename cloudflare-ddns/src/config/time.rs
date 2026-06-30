@@ -23,13 +23,15 @@ impl<'de> Deserialize<'de> for Time {
                         nanosecond,
                     }),
                 offset: None,
-            } => Ok(Time(Duration::new(
-                (hour as u64 * 60 * 60) + (minute as u64 * 60) + second as u64,
-                nanosecond,
-            ))),
-            _ => Err(serde::de::Error::custom(
-                "expected a time value in the format of 'HH:MM:SS(.nnnnnnnnn optional)'",
-            )),
+            } => {
+                let duration = Duration::from_hours(u64::from(hour))
+                    .saturating_add(Duration::from_mins(u64::from(minute)))
+                    .saturating_add(Duration::from_secs(u64::from(second.unwrap_or(0))))
+                    .saturating_add(Duration::from_nanos(u64::from(nanosecond.unwrap_or(0))));
+
+                Ok(Time(duration))
+            }
+            _ => Err(serde::de::Error::custom("expected a toml time value")),
         }
     }
 }
