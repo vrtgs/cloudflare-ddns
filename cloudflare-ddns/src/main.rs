@@ -273,7 +273,7 @@ impl DDNSContext {
         impl UpdateStatus {
             pub fn msg(self) -> &'static str {
                 match self {
-                    UpdateStatus::SameIp => "IP didn't change... skipping record update.",
+                    UpdateStatus::SameIp => "IP didn't change, skipped record update.",
                     UpdateStatus::Updated => "Successfully Updated!",
                     UpdateStatus::NoRecordExists => "No Record exists in cloudflare.",
                 }
