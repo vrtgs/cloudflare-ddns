@@ -18,6 +18,7 @@ use serde::Deserialize;
 use serde::de::DeserializeOwned;
 use std::borrow::Cow;
 use std::cell::Cell;
+use std::fmt::Display;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::num::NonZeroU8;
 use std::panic::AssertUnwindSafe;
@@ -248,46 +249,100 @@ impl DDNSContext {
         Ok(())
     }
 
-    pub async fn run_ddns(&self, cfg: Config) -> Result<bool> {
+    pub async fn run_ddns(&self, cfg: Config) -> Result<impl Display> {
         let ((v4_record, v6_record), (v4_ip, v6_ip)) =
             try_join!(self.get_records(&cfg), self.get_ips(&cfg))?;
 
-        let has_ip_source = match (&v4_record, &v6_record) {
+        let has_ip_source = match (v4_record.as_ref(), v6_record.as_ref()) {
             (Some(_), Some(_)) => v4_ip.is_some() || v6_ip.is_some(),
             (Some(_), None) => v4_ip.is_some(),
             (None, Some(_)) => v6_ip.is_some(),
             (None, None) => {
-                unreachable!("this case should have errored before reaching this point")
+                unreachable!("two empty records didn't cause an error")
             }
         };
 
         ensure!(has_ip_source, GetIpError::NoIpSources);
+
+        enum UpdateStatus {
+            SameIp,
+            Updated,
+            NoRecordExists,
+        }
+
+        impl UpdateStatus {
+            pub fn msg(self) -> &'static str {
+                match self {
+                    UpdateStatus::SameIp => "IP didn't change... skipping record update.",
+                    UpdateStatus::Updated => "Successfully Updated!",
+                    UpdateStatus::NoRecordExists => "No Record exists in cloudflare.",
+                }
+            }
+        }
 
         async fn update<T: Into<IpAddr> + Eq>(
             this: &DDNSContext,
             cfg: &Config,
             record: Option<Record<T>>,
             ip: Option<T>,
-        ) -> Result<bool> {
+        ) -> Result<UpdateStatus> {
             if let Some(record) = record
                 && let Some(ip) = ip
             {
                 if record.ip == ip {
-                    return Ok(false);
+                    return Ok(UpdateStatus::SameIp);
                 }
 
-                this.update_record(&record.id, ip.into(), cfg).await?
+                this.update_record(&record.id, ip.into(), cfg).await?;
+                return Ok(UpdateStatus::Updated);
             }
 
-            Ok(false)
+            Ok(UpdateStatus::NoRecordExists)
         }
 
-        let (changed_v4, changed_v6) = try_join!(
+        let (changed_v4, changed_v6) = join!(
             update(self, &cfg, v4_record, v4_ip),
             update(self, &cfg, v6_record, v6_ip),
-        )?;
+        );
 
-        Ok(changed_v4 || changed_v6)
+        match (changed_v4, changed_v6) {
+            (Err(err), Ok(UpdateStatus::NoRecordExists))
+            | (Ok(UpdateStatus::NoRecordExists), Err(err)) => Err(err),
+
+            (Err(v4), Err(v6)) => Err(v4.context(v6)),
+
+            (Ok(UpdateStatus::NoRecordExists), Ok(UpdateStatus::NoRecordExists)) => {
+                unreachable!("at least one record exists")
+            }
+
+            (Ok(status), Ok(UpdateStatus::NoRecordExists))
+            | (Ok(UpdateStatus::NoRecordExists), Ok(status))
+                if let ty = cfg.zone().ip_type()
+                    && !matches!(ty, IpType::Any) =>
+            {
+                assert!(
+                    !matches!(ty, IpType::Both),
+                    "BUG: requested both ip types; found one and try to continue updating only one"
+                );
+
+                Ok(Cow::Borrowed(status.msg()))
+            }
+
+            (status_v4 @ Ok(_), status_v6 @ Ok(_))
+            | (status_v4 @ Ok(_), status_v6 @ Err(_))
+            | (status_v4 @ Err(_), status_v6 @ Ok(_)) => {
+                let display = |res: Result<UpdateStatus>| {
+                    res.map_or_else(
+                        |err| Cow::Owned(format!("Failed: \n{err}\n")),
+                        |status| Cow::Borrowed(status.msg()),
+                    )
+                };
+
+                let msg = format!("IPv4: {} IPv6: {}", display(status_v4), display(status_v6));
+
+                Ok(Cow::Owned(msg))
+            }
+        }
     }
 }
 
@@ -353,8 +408,7 @@ async fn real_main() -> Result<Action> {
                 dbg_println!("updating");
                 match ctx.run_ddns(cfg_store.load_config()).await {
                     Err(err) => ctx.user_messages.error(err.to_string()).await,
-                    Ok(true) => dbg_println!("successfully updated"),
-                    Ok(false) => dbg_println!("IP didn't change skipping record update"),
+                    Ok(debug_message) => dbg_println!("{}", debug_message),
                 }
             },
             res = updaters_manager.watch() => match res {
