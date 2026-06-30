@@ -16,7 +16,7 @@
     incremental = false
 
 [profile.dev]
-    opt-level = 1
+    opt-level = 0
     incremental = true
     debug = true
     panic = "unwind"
