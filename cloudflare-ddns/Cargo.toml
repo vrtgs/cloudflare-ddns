@@ -1,6 +1,6 @@
 [package]
 name = "cloudflare-ddns"
-version = "0.3.2"
+version = "0.3.5"
 edition = "2024"
 
 [features]
@@ -20,8 +20,8 @@ simdutf8              = "0.1.5"
 url                   = "2"
 toml                  = "1"
 serde_json            = "1"
-bytes                 = "1.11.0"
-thiserror             = "2.0.17"
+bytes                 = "1.12.0"
+thiserror             = "2.0.18"
 ahash                 = "0.8.11"
 arc-swap              = "1.7.1"
 notify                = "8.0.0"

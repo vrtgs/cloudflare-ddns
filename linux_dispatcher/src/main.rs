@@ -6,7 +6,8 @@ cfg_if::cfg_if! {
             include_str!("../../cloudflare-ddns/src/network_listener/linux/socket-path");
 
         fn main() {
-            let _ = UnixStream::connect(SOCKET_PATH);
+            let result = UnixStream::connect(SOCKET_PATH);
+            eprintln!("update status: {result:?}");
         }
     } else {
         fn main() {

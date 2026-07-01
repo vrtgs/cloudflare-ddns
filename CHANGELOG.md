@@ -4,7 +4,12 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org).
 
-## [0.3.4] - 2025-10-24
+## [0.3.5] - 2026-7-1
+- Fix linux native NetworkManager OS notifications and network status check
+- Update version number in CLI
+- Update dependencies
+
+## [0.3.4] - 2026-6-30
 - Add better diagnostic messages and update reporting
 - update dependencies
 

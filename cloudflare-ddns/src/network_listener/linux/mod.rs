@@ -1,18 +1,18 @@
-use crate::global_rt;
 use crate::updaters::Updater;
+use crate::{abort, global_rt};
 use anyhow::Result;
 use dbus::nonblock::{Proxy, SyncConnection};
 use futures::{StreamExt, TryStreamExt};
 use std::fs::OpenOptions;
+use std::hint::cold_path;
 use std::io::{Read, Write};
 use std::num::NonZero;
-use std::os::unix::fs::OpenOptionsExt;
+use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 use std::path::Path;
 use std::sync::{Arc, LazyLock};
 use std::time::Duration;
 use std::{io, thread};
 use tempfile::TempPath;
-use tokio::fs;
 use tokio::net::UnixListener;
 use tokio::sync::OnceCell as TokioOnceCell;
 use tokio::task::JoinHandle;
@@ -38,8 +38,8 @@ enum DbusError {
 }
 
 async fn check_network_status() -> Result<bool, DbusError> {
-    static NETWORK_MANAGER: LazyLock<Result<&SyncConnection, dbus::Error>> = LazyLock::new(|| {
-        let (resource, conn) = dbus_tokio::connection::new_session_sync()?;
+    static DBUS_CONN: LazyLock<Result<&SyncConnection, dbus::Error>> = LazyLock::new(|| {
+        let (resource, conn) = dbus_tokio::connection::new_system_sync()?;
 
         global_rt::spawn(resource);
 
@@ -50,18 +50,20 @@ async fn check_network_status() -> Result<bool, DbusError> {
     let proxy = Proxy::new(
         "org.freedesktop.NetworkManager",
         "/org/freedesktop/NetworkManager",
-        Duration::from_secs(3),
-        NETWORK_MANAGER.as_ref().copied()?,
+        Duration::from_secs(10),
+        DBUS_CONN.as_ref().copied()?,
     );
 
     // Call the Get method on the org.freedesktop.DBus.Properties interface
-    let (connectivity,): (u32,) = proxy
+    let (connectivity,): (dbus::arg::Variant<u32>,) = proxy
         .method_call(
             "org.freedesktop.DBus.Properties",
             "Get",
             ("org.freedesktop.NetworkManager", "Connectivity"),
         )
         .await?;
+
+    let connectivity = connectivity.0;
 
     // value can be:
     //
@@ -70,23 +72,41 @@ async fn check_network_status() -> Result<bool, DbusError> {
     // 2: Portal
     // 3: Limited
     // 4: Full
-    Ok(connectivity >= 2)
+    Ok(matches!(connectivity, 0 | 2 | 3 | 4))
 }
 
 pub async fn has_internet() -> bool {
     static SUPPORTS_NETWORK_MANAGER: TokioOnceCell<bool> = TokioOnceCell::const_new();
 
-    match SUPPORTS_NETWORK_MANAGER
-        .get_or_init(|| async { check_network_status().await.is_ok() })
-        .await
-    {
-        true => match check_network_status().await {
-            Ok(x) => x,
-            Err(e) => {
-                eprintln!("Unexpected error checking internet {e} switching to fallback");
-                super::fallback_has_internet().await
+    let mut ret_val = None::<bool>;
+
+    let supports_network_manager = *SUPPORTS_NETWORK_MANAGER
+        .get_or_init(|| async {
+            match check_network_status().await {
+                Ok(val) => {
+                    ret_val = Some(val);
+                    true
+                }
+                Err(_) => false,
             }
-        },
+        })
+        .await;
+
+    match supports_network_manager {
+        true => {
+            if let Some(val) = ret_val {
+                cold_path();
+                return val;
+            }
+
+            match check_network_status().await {
+                Ok(x) => x,
+                Err(e) => {
+                    eprintln!("Unexpected error checking internet {e} switching to fallback");
+                    super::fallback_has_internet().await
+                }
+            }
+        }
         false => super::fallback_has_internet().await,
     }
 }
@@ -128,8 +148,11 @@ async fn place_dispatcher() -> Result<()> {
                     Ok(eq && dispatcher_bytes.as_slice().is_empty())
                 };
 
-                let invalid =
-                    |loc: &Path| Ok::<_, io::Error>(!loc.try_exists()? || eq_contents(loc)?);
+                let invalid = |loc: &Path| {
+                    let exists = loc.try_exists()?;
+                    let valid = exists && eq_contents(loc)?;
+                    Ok::<_, io::Error>(!valid)
+                };
 
                 if invalid(&location)? && parent.try_exists()? {
                     OpenOptions::new()
@@ -161,13 +184,29 @@ async fn listen(updater: &Updater) -> Result<()> {
 
     const SOCK: &str = include_str!("./socket-path");
 
-    if fs::try_exists(SOCK).await? {
-        tokio::fs::remove_file(SOCK).await?;
-    }
-    let sock = TempPath::from_path(SOCK);
+    let sock = tokio::task::spawn_blocking(|| {
+        let path = Path::new(SOCK);
+        if !path.is_absolute() {
+            abort!("unix socket path is not absolute")
+        }
+
+        if path.try_exists()? {
+            std::fs::remove_file(path)?
+        }
+
+        TempPath::try_from_path(path)
+    })
+    .await??;
+
     let listener = UnixListener::bind(&sock)?;
+
+    tokio::task::spawn_blocking(|| {
+        std::fs::set_permissions(SOCK, std::fs::Permissions::from_mode(0o777))
+    })
+    .await??;
+
     loop {
-        let _ = listener.accept().await?;
+        let (_stream, _peer) = listener.accept().await?;
         if updater.update().is_err() {
             return Ok(());
         }

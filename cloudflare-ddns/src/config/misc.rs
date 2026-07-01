@@ -17,7 +17,7 @@ pub struct RefreshConfig {
 impl RefreshConfig {
     #[inline]
     const fn default_interval() -> Time {
-        Time(Duration::from_secs(60 * 60)) // 1 hour
+        const { Time(Duration::from_hours(1)) }
     }
 
     #[inline]

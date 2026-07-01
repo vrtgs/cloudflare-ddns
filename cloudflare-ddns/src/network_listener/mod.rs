@@ -15,18 +15,6 @@ use tokio::net::TcpStream;
 use tokio::sync::Notify;
 use tokio::try_join;
 
-#[must_use = "its useless to check if we have internet if you dont use it"]
-#[inline(always)]
-pub async fn has_internet() -> bool {
-    sys_common::has_internet().await
-}
-
-pub fn subscribe(updaters_manager: &mut UpdatersManager) -> Result<(), Infallible> {
-    let (updater, jh_entry) = updaters_manager.add_updater("network-listener");
-    jh_entry.insert(sys_common::subscribe(updater));
-    Ok(())
-}
-
 #[allow(dead_code)]
 async fn fallback_has_internet() -> bool {
     static USED_FALLBACK_YET: AtomicBool = AtomicBool::new(false);
@@ -101,5 +89,17 @@ async fn fallback_listen(updater: &Updater) -> Result<(), Infallible> {
         _ = updater.wait_shutdown() => ()
     }
 
+    Ok(())
+}
+
+#[must_use = "its useless to check if we have internet if you dont use it"]
+#[inline(always)]
+pub async fn has_internet() -> bool {
+    sys_common::has_internet().await
+}
+
+pub fn subscribe(updaters_manager: &mut UpdatersManager) -> Result<(), Infallible> {
+    let (updater, jh_entry) = updaters_manager.add_updater("network-listener");
+    jh_entry.insert(sys_common::subscribe(updater));
     Ok(())
 }
