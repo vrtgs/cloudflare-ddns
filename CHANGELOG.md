@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org).
 
+## [0.3.6] - 2026-7-1
+- Fix linux dispatcher saving / placing logic
+
 ## [0.3.5] - 2026-7-1
 - Fix linux native NetworkManager OS notifications and network status check
 - Update version number in CLI

@@ -4,7 +4,7 @@ Auto update the cloudflare DNS for dynamic IPs.
 ## Download
 Check the [last release](https://github.com/Vrtgs/cloudflare-ddns/releases). Download the executable that matches your system
 
-After downloading unzip the folder.
+After downloading, unzip the folder.
 
 ## Configuration
 There would be 4 files, edit `api.toml` with the following format:

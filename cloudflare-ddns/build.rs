@@ -112,11 +112,19 @@ async fn generate_dispatcher() -> anyhow::Result<()> {
 
         let target = get_var!("TARGET")?;
 
+        // Cargo sets CARGO_CFG_DEBUG_ASSERTIONS to "true" or "false"
+        let debug_assertions = get_var!("CARGO_CFG_DEBUG_ASSERTIONS")
+            .map(|v| v == "true")
+            .unwrap_or(false);
+
         tokio::task::spawn_blocking(move || {
             let artifact = artifact_dependency::ArtifactDependency::builder()
                 .crate_name("linux_dispatcher")
                 .artifact_type(CrateType::Executable)
-                .profile(Profile::Other("linux-dispatcher".into()))
+                .profile(match debug_assertions {
+                    false => Profile::Other("linux-dispatcher".into()),
+                    true => Profile::Dev,
+                })
                 .target_name(target.trim())
                 .build_always(true)
                 .build_missing(false)

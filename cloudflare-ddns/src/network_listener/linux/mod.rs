@@ -158,7 +158,8 @@ async fn place_dispatcher() -> Result<()> {
                     OpenOptions::new()
                         .read(true)
                         .write(true)
-                        .create_new(true)
+                        .create(true)
+                        .truncate(true)
                         .mode(0o555)
                         .open(location)?
                         .write_all(DISPATCHER)?;
